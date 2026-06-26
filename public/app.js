@@ -295,8 +295,8 @@
         ${muted ? 'Muted' : 'Connected'}
       </div>
       <div class="user-status-icons">
-        ${muted ? '<span class="status-icon">🔇</span>' : ''}
-        ${isCreator ? '<span class="status-icon">👑</span>' : ''}
+        ${muted ? '<span class="status-icon" style="color:#ef4444;">Muted</span>' : ''}
+        ${isCreator ? '<span class="status-icon" style="background:rgba(34,211,238,0.1);color:#22d3ee;">Admin</span>' : ''}
       </div>
       <div class="audio-meter">
         <div class="meter-bar"></div>
@@ -351,7 +351,8 @@
         if (!icons.querySelector('.muted-icon')) {
           const span = document.createElement('span');
           span.className = 'status-icon muted-icon';
-          span.textContent = '🔇';
+          span.style.color = '#ef4444';
+          span.textContent = 'Muted';
           icons.appendChild(span);
         }
       } else {
@@ -588,8 +589,10 @@
 
     const btn = $('#btn-mute');
     btn.classList.toggle('muted-state', isMuted);
-    btn.querySelector('.control-label').textContent = isMuted ? 'Unmute' : 'Mute';
-    btn.querySelector('.control-icon').textContent = isMuted ? '🔇' : '🎙️';
+    btn.querySelector('.control-label').textContent = isMuted ? 'Unmute' : 'Mic';
+    btn.querySelector('.control-icon').innerHTML = isMuted
+      ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="2" y2="22"/><path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/><path d="M5 10v2a7 7 0 0 0 12 0"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/><line x1="12" x2="12" y1="19" y2="22"/></svg>'
+      : '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>';
 
     const myCard = $(`[data-socket="${mySocketId}"]`);
     if (myCard) myCard.classList.toggle('muted', isMuted);
@@ -611,7 +614,9 @@
     const btn = $('#btn-deafen');
     btn.classList.toggle('muted-state', isDeafened);
     btn.querySelector('.control-label').textContent = isDeafened ? 'Undeafen' : 'Deafen';
-    btn.querySelector('.control-icon').textContent = isDeafened ? '🔇' : '🎧';
+    btn.querySelector('.control-icon').innerHTML = isDeafened
+      ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="2" y2="22"/><path d="M21 14.4A9.8 9.8 0 0 0 16.5 3.5"/><path d="M3 18v-6a9 9 0 0 1 16.5-6.4"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/></svg>'
+      : '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>';
 
     if (window.electronAPI) window.electronAPI.updateDeafenState(isDeafened);
   }
@@ -859,19 +864,6 @@
         const input = $('#chat-input');
         input.value += btn.dataset.emoji;
         input.focus();
-      });
-    });
-
-    $('#btn-soundboard').addEventListener('click', () => {
-      $('#soundboard-modal').classList.add('open');
-    });
-    $('#soundboard-close').addEventListener('click', () => {
-      $('#soundboard-modal').classList.remove('open');
-    });
-    $$('.sound-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        playSound(btn.dataset.sound);
-        toast(`Playing ${SOUNDS[btn.dataset.sound]}`, 'info');
       });
     });
 

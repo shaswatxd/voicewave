@@ -85,9 +85,9 @@
   .badge { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; background: #f23f43; color: #fff; border-radius: 8px; font-size: 0.6rem; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
 
   /* Chat panel */
-  .chat-panel { width: 320px; display: flex; flex-direction: column; background: #0b0f1a; border-left: 1px solid rgba(255,255,255,0.04); transform: translateX(100%); transition: transform 0.25s ease; position: absolute; right: 0; top: 0; bottom: 0; z-index: 20; }
+  .chat-panel { width: 340px; display: flex; flex-direction: column; background: #0b0f1a; border-left: 1px solid rgba(255,255,255,0.04); transform: translateX(100%); transition: transform 0.25s ease; position: absolute; right: 0; top: 0; bottom: 0; z-index: 20; }
   .chat-panel.open { transform: translateX(0); }
-  .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); flex-shrink: 0; }
   .chat-header h3 { font-size: 0.9rem; font-weight: 600; }
   .chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
   .chat-msg { padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,0.02); animation: chatMsgIn 0.2s ease; }
@@ -156,6 +156,38 @@
   .btn-danger:hover { opacity: 0.85; }
   .btn-sm { padding: 6px 14px; font-size: 0.8rem; border-radius: 8px; }
   .full-width { width: 100%; }
+
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+    .chat-panel { width: 100%; border-left: none; border-radius: 0; }
+    .user-grid { gap: 12px; padding: 16px; }
+    .user-card { min-width: 140px; max-width: 160px; padding: 20px 14px; }
+    .user-avatar { width: 52px; height: 52px; font-size: 1.1rem; }
+    .user-name { font-size: 0.8rem; }
+    .control-btn { padding: 8px 12px; min-width: 48px; }
+    .control-icon svg { width: 20px; height: 20px; }
+    .control-label { font-size: 0.55rem; }
+    .room-header { padding: 8px 12px; }
+    .btn-icon { width: 34px; height: 34px; }
+    .room-timer { font-size: 0.78rem; }
+    .room-id-label { font-size: 0.75rem; }
+  }
+  @media (max-width: 480px) {
+    .control-bar { gap: 4px; padding: 8px 8px 16px; }
+    .controls-left, .controls-center, .controls-right { gap: 4px; }
+    .control-btn { padding: 8px 10px; min-width: 44px; border-radius: 10px; }
+    .control-label { display: none; }
+    .control-icon svg { width: 18px; height: 18px; }
+    .user-grid { gap: 10px; padding: 12px; }
+    .user-card { min-width: 120px; max-width: 140px; padding: 16px 10px; }
+    .user-avatar { width: 44px; height: 44px; font-size: 1rem; }
+    .user-name { font-size: 0.75rem; }
+    .room-header { padding: 6px 10px; gap: 4px; }
+    .room-actions { gap: 4px; }
+    .btn-icon { width: 32px; height: 32px; font-size: 0.85rem; }
+    .room-code { font-size: 0.78rem; }
+    .room-timer { font-size: 0.72rem; }
+  }
 </style>
 </head>
 <body>
@@ -228,7 +260,6 @@
     <div class="feature-pills">
       <span class="pill">🎙️ P2P Voice</span>
       <span class="pill">💬 Chat</span>
-      <span class="pill">🎵 Soundboard</span>
       <span class="pill">🔒 Password Rooms</span>
       <span class="pill">📱 Works Everywhere</span>
     </div>
@@ -241,12 +272,18 @@
   <div class="room-header">
     <div class="room-info">
       <span class="room-id-label">Room: <span id="room-id-display" class="room-code"></span></span>
-      <button class="btn-icon" id="btn-copy-room" title="Copy invite link">📋</button>
+      <button class="btn-icon" id="btn-copy-room" title="Copy invite link">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+      </button>
     </div>
     <div class="room-timer" id="room-timer">00:00</div>
     <div class="room-actions">
-      <button class="btn-icon" id="btn-invite" title="Invite">📤</button>
-      <button class="btn-icon" id="btn-settings" title="Settings">⚙️</button>
+      <button class="btn-icon" id="btn-invite" title="Invite">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+      </button>
+      <button class="btn-icon" id="btn-settings" title="Settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
     </div>
   </div>
 
@@ -258,7 +295,9 @@
     <div class="chat-panel" id="chat-panel">
       <div class="chat-header">
         <h3>Chat</h3>
-        <button class="btn-icon" id="btn-close-chat">✕</button>
+        <button class="btn-icon" id="btn-close-chat" title="Close chat">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+        </button>
       </div>
       <div class="chat-messages" id="chat-messages"></div>
       <div class="typing-indicator" id="typing-indicator" style="display:none;">
@@ -288,40 +327,50 @@
   <div class="control-bar">
     <div class="controls-left">
       <button class="control-btn" id="btn-mute" title="Toggle Mute (M)">
-        <span class="control-icon">🎙️</span>
-        <span class="control-label">Mute</span>
+        <span class="control-icon" id="mute-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+        </span>
+        <span class="control-label">Mic</span>
       </button>
       <button class="control-btn" id="btn-deafen" title="Toggle Deafen (D)">
-        <span class="control-icon">🎧</span>
+        <span class="control-icon" id="deafen-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+        </span>
         <span class="control-label">Deafen</span>
       </button>
       <button class="control-btn" id="btn-hand" title="Raise Hand (H)">
-        <span class="control-icon">✋</span>
+        <span class="control-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v7"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+        </span>
         <span class="control-label">Hand</span>
       </button>
     </div>
     <div class="controls-center">
-      <button class="control-btn" id="btn-soundboard" title="Soundboard">
-        <span class="control-icon">🎵</span>
-        <span class="control-label">Sounds</span>
-      </button>
       <button class="control-btn" id="btn-record" title="Record Session">
-        <span class="control-icon">⏺️</span>
+        <span class="control-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+        </span>
         <span class="control-label">Record</span>
       </button>
     </div>
     <div class="controls-right">
       <button class="control-btn" id="btn-chat-toggle" title="Toggle Chat (C)">
-        <span class="control-icon">💬</span>
+        <span class="control-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></svg>
+        </span>
         <span class="control-label">Chat</span>
         <span class="badge" id="chat-badge" style="display:none;">0</span>
       </button>
       <button class="control-btn" id="btn-participants" title="Participants">
-        <span class="control-icon">👥</span>
+        <span class="control-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </span>
         <span class="control-label" id="participant-count">0</span>
       </button>
       <button class="control-btn" id="btn-leave" title="Leave Room" style="background:rgba(239,68,68,0.15);color:#ef4444;margin-left:8px;">
-        <span class="control-icon">📞</span>
+        <span class="control-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/><line x1="1" x2="23" y1="1" y2="23"/></svg>
+        </span>
         <span class="control-label">Leave</span>
       </button>
     </div>
@@ -337,28 +386,6 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" id="modal-cancel">Cancel</button>
       <button class="btn btn-primary" id="modal-submit">Join</button>
-    </div>
-  </div>
-</div>
-
-<!-- SOUNDBOARD MODAL -->
-<div class="modal" id="soundboard-modal">
-  <div class="modal-card">
-    <h3>Soundboard</h3>
-    <div class="sound-grid">
-      <button class="sound-btn" data-sound="airhorn">📯 Airhorn</button>
-      <button class="sound-btn" data-sound="clap">👏 Clap</button>
-      <button class="sound-btn" data-sound="laugh">😂 Laugh</button>
-      <button class="sound-btn" data-sound="ding">🔔 Ding</button>
-      <button class="sound-btn" data-sound="bruh">💀 Bruh</button>
-      <button class="sound-btn" data-sound="sad">😢 Sad</button>
-      <button class="sound-btn" data-sound="win">🏆 Win</button>
-      <button class="sound-btn" data-sound="drum">🥁 Drum</button>
-      <button class="sound-btn" data-sound="fart">💨 Fart</button>
-      <button class="sound-btn" data-sound="pop">🎈 Pop</button>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" id="soundboard-close">Close</button>
     </div>
   </div>
 </div>
