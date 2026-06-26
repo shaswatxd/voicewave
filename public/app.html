@@ -12,7 +12,23 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.2">
+<link rel="stylesheet" href="/app.css?v=1.0.3">
+<style>
+  .screen { display: none; width: 100vw; height: 100vh; max-height: 100dvh; }
+  .screen.active { display: flex !important; flex-direction: column !important; }
+  #lobby.active { flex-direction: column !important; align-items: center; justify-content: center; }
+  #room.active { display: flex !important; flex-direction: column !important; }
+  .room-header { flex-shrink: 0; }
+  .room-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+  .control-bar { flex-shrink: 0; }
+  .titlebar { display: flex; align-items: center; justify-content: space-between; height: 36px; background: #040810; border-bottom: 1px solid rgba(255,255,255,0.07); flex-shrink: 0; user-select: none; position: relative; z-index: 500; }
+  .titlebar-drag { flex: 1; display: flex; align-items: center; padding-left: 14px; -webkit-app-region: drag; }
+  .titlebar-title { font-size: 0.72rem; font-weight: 600; color: #8b9ab8; letter-spacing: 0.04em; }
+  .titlebar-buttons { display: flex; align-items: center; -webkit-app-region: no-drag; }
+  .titlebar-btn { width: 46px; height: 36px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: #8b9ab8; cursor: pointer; transition: all 0.15s; }
+  .titlebar-btn:hover { background: rgba(255,255,255,0.08); color: #f0f4ff; }
+  .titlebar-close:hover { background: #ef4444; color: #fff; }
+</style>
 </head>
 <body>
 
@@ -272,6 +288,6 @@
     document.getElementById('tb-close').addEventListener('click', () => window.electronAPI.close());
   }
 </script>
-<script src="/app.js?v=1.0.2"></script>
+<script src="/app.js?v=1.0.3"></script>
 </body>
 </html>

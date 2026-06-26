@@ -39,13 +39,22 @@ body {
 ::-webkit-scrollbar-thumb { background: rgba(34,211,238,0.3); border-radius: 2px; }
 
 .screen { display: none; width: 100vw; height: 100vh; max-height: 100dvh; }
-.screen.active { display: flex; flex-direction: column; }
+.screen.active { display: flex; flex-direction: column !important; }
 
 /* ── LOBBY ── */
 #lobby.active {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+}
+
+/* ── ROOM LAYOUT ── */
+#room.active {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 .lobby-container {
   width: 100%; height: 100vh;
