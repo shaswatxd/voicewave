@@ -23,7 +23,7 @@
   #lobby.active { justify-content: center; align-items: center; }
 
   /* ROOM LAYOUT - Discord style */
-  #room.active { background: #060a12; }
+  #room.active { background: #060a12; padding-bottom: env(safe-area-inset-bottom, 8px); }
 
   .titlebar { display: flex; align-items: center; justify-content: space-between; height: 36px; background: #040810; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; user-select: none; z-index: 500; }
   .titlebar-drag { flex: 1; display: flex; align-items: center; padding-left: 14px; -webkit-app-region: drag; }
@@ -73,7 +73,7 @@
   .meter-bar.high { background: #ef4444; }
 
   /* Discord-style control bar - centered bottom dock */
-  .control-bar { flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 12px 0 16px; background: transparent; gap: 6px; }
+  .control-bar { flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 12px 0 20px; background: transparent; gap: 6px; }
   .controls-left, .controls-center, .controls-right { display: flex; gap: 6px; align-items: center; }
   .control-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 16px; background: #2b2d31; border: none; border-radius: 12px; cursor: pointer; color: #b5bac1; font-family: inherit; transition: all 0.15s; position: relative; min-width: 56px; }
   .control-btn:hover { background: #35373c; color: #f2f3f5; }
