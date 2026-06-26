@@ -4,5 +4,8 @@ nixPkgs = ["nodejs_18"]
 [phases.install]
 cmds = ["npm i --omit=dev"]
 
+[phases.build]
+cmds = ["echo skipping build"]
+
 [start]
 cmd = "node server.js"
