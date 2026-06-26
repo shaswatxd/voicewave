@@ -12,15 +12,17 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.3">
+<link rel="stylesheet" href="/app.css?v=1.0.4">
 <style>
   .screen { display: none; width: 100vw; height: 100vh; max-height: 100dvh; }
   .screen.active { display: flex !important; flex-direction: column !important; }
   #lobby.active { flex-direction: column !important; align-items: center; justify-content: center; }
   #room.active { display: flex !important; flex-direction: column !important; }
-  .room-header { flex-shrink: 0; }
+  .room-header { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; background: rgba(6,10,18,0.95); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.05); z-index: 10; }
   .room-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
-  .control-bar { flex-shrink: 0; }
+  .control-bar { display: flex; align-items: center; justify-content: center; padding: 10px 16px; flex-shrink: 0; gap: 8px; }
+  .user-grid { flex: 1; display: flex; flex-wrap: wrap; gap: 20px; padding: 24px; overflow-y: auto; align-content: center; justify-content: center; }
+  .user-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 24px; text-align: center; transition: all 0.3s; position: relative; min-width: 180px; max-width: 220px; width: 100%; }
   .titlebar { display: flex; align-items: center; justify-content: space-between; height: 36px; background: #040810; border-bottom: 1px solid rgba(255,255,255,0.07); flex-shrink: 0; user-select: none; position: relative; z-index: 500; }
   .titlebar-drag { flex: 1; display: flex; align-items: center; padding-left: 14px; -webkit-app-region: drag; }
   .titlebar-title { font-size: 0.72rem; font-weight: 600; color: #8b9ab8; letter-spacing: 0.04em; }
@@ -28,6 +30,13 @@
   .titlebar-btn { width: 46px; height: 36px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: #8b9ab8; cursor: pointer; transition: all 0.15s; }
   .titlebar-btn:hover { background: rgba(255,255,255,0.08); color: #f0f4ff; }
   .titlebar-close:hover { background: #ef4444; color: #fff; }
+  .controls-left, .controls-center, .controls-right { display: flex; gap: 6px; align-items: center; }
+  .control-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 16px; background: #111827; border: none; border-radius: 12px; cursor: pointer; color: #8b9ab8; font-family: inherit; transition: all 0.2s; position: relative; min-width: 60px; }
+  .control-btn:hover { background: rgba(255,255,255,0.08); color: #f0f4ff; }
+  .control-btn.active { background: rgba(34,211,238,0.12); color: #22d3ee; }
+  .control-btn.muted-state { background: rgba(239,68,68,0.12); color: #ef4444; }
+  .control-icon { font-size: 1.2rem; }
+  .control-label { font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 </style>
 </head>
 <body>
@@ -119,7 +128,6 @@
     <div class="room-actions">
       <button class="btn-icon" id="btn-invite" title="Invite">📤</button>
       <button class="btn-icon" id="btn-settings" title="Settings">⚙️</button>
-      <button class="btn btn-danger btn-sm" id="btn-leave">Leave</button>
     </div>
   </div>
 
@@ -192,6 +200,10 @@
       <button class="control-btn" id="btn-participants" title="Participants">
         <span class="control-icon">👥</span>
         <span class="control-label" id="participant-count">0</span>
+      </button>
+      <button class="control-btn" id="btn-leave" title="Leave Room" style="background:rgba(239,68,68,0.15);color:#ef4444;margin-left:8px;">
+        <span class="control-icon">📞</span>
+        <span class="control-label">Leave</span>
       </button>
     </div>
   </div>
@@ -288,6 +300,6 @@
     document.getElementById('tb-close').addEventListener('click', () => window.electronAPI.close());
   }
 </script>
-<script src="/app.js?v=1.0.3"></script>
+<script src="/app.js?v=1.0.4"></script>
 </body>
 </html>
