@@ -2,15 +2,37 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>VoiceWave</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#060a12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/app.css?v=1.0.2">
 </head>
 <body>
+
+<!-- CUSTOM TITLE BAR (Electron) -->
+<div id="titlebar" class="titlebar" style="display:none;">
+  <div class="titlebar-drag">
+    <span class="titlebar-title">🌊 VoiceWave</span>
+  </div>
+  <div class="titlebar-buttons">
+    <button class="titlebar-btn" id="tb-minimize" title="Minimize">
+      <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="5.5" width="8" height="1" fill="currentColor"/></svg>
+    </button>
+    <button class="titlebar-btn" id="tb-maximize" title="Maximize">
+      <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" rx="1" stroke="currentColor" stroke-width="1" fill="none"/></svg>
+    </button>
+    <button class="titlebar-btn titlebar-close" id="tb-close" title="Close">
+      <svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</div>
 
 <!-- TOAST CONTAINER -->
 <div id="toast-container"></div>
@@ -242,6 +264,14 @@
 </div>
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+  if (window.electronAPI && window.electronAPI.isElectron) {
+    document.getElementById('titlebar').style.display = 'flex';
+    document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
+    document.getElementById('tb-maximize').addEventListener('click', () => window.electronAPI.maximize());
+    document.getElementById('tb-close').addEventListener('click', () => window.electronAPI.close());
+  }
+</script>
 <script src="/app.js?v=1.0.2"></script>
 </body>
 </html>
