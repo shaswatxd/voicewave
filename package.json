@@ -1,0 +1,58 @@
+{
+  "name": "voicewave",
+  "version": "1.0.2",
+  "description": "Crystal-clear real-time voice chat — WebRTC P2P mesh with Socket.IO signaling",
+  "main": "main.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "electron": "electron .",
+    "build": "electron-builder --win --x64",
+    "build:portable": "electron-builder --win --x64 portable",
+    "push": "node scripts/push.js",
+    "icons": "node scripts/gen-icon.js"
+  },
+  "build": {
+    "appId": "com.shaswatxd.voicewave",
+    "productName": "VoiceWave",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "public/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "VoiceWave-${version}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico"
+    },
+    "portable": {
+      "artifactName": "VoiceWave-${version}-Portable.${ext}"
+    }
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3",
+    "sharp": "^0.35.2"
+  },
+  "license": "MIT",
+  "author": "shaswatxd"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "VoiceWave",
+  "short_name": "VoiceWave",
+  "description": "Crystal-clear real-time voice chat",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#060a12",
+  "theme_color": "#060a12",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

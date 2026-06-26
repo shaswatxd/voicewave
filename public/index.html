@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoiceWave — Crystal-Clear Voice Chat</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#060a12">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #060a12;
+    --bg2: #0c1220;
+    --bg3: #111827;
+    --cyan: #22d3ee;
+    --purple: #a855f7;
+    --pink: #ec4899;
+    --danger: #ef4444;
+    --success: #22c55e;
+    --text: #f0f4ff;
+    --muted: #8b9ab8;
+    --border: rgba(255,255,255,0.07);
+    --glass: rgba(255,255,255,0.04);
+    --glow-c: rgba(34,211,238,0.15);
+    --glow-p: rgba(168,85,247,0.15);
+    --radius: 14px;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(34,211,238,0.3); border-radius: 2px; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(6,10,18,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 0;
+  }
+  nav .inner {
+    display: flex; align-items: center; justify-content: space-between;
+    max-width: 1100px; margin: 0 auto; padding: 0 24px;
+  }
+  .nav-logo {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 1.1rem;
+    color: var(--text); text-decoration: none;
+  }
+  .logo-icon {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .nav-links { display: flex; gap: 28px; list-style: none; }
+  .nav-links a {
+    color: var(--muted); text-decoration: none; font-size: 0.85rem; font-weight: 500;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--cyan); }
+  .nav-badge {
+    font-family: var(--mono); font-size: 0.72rem;
+    color: var(--cyan); background: rgba(34,211,238,0.1);
+    border: 1px solid rgba(34,211,238,0.25);
+    padding: 3px 10px; border-radius: 20px;
+  }
+
+  .hero {
+    padding: 140px 0 80px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
+    width: 800px; height: 800px;
+    background: radial-gradient(circle, rgba(34,211,238,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero::after {
+    content: '';
+    position: absolute; top: 100px; left: 30%; transform: translateX(-50%);
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(168,85,247,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 0.78rem;
+    color: var(--cyan); letter-spacing: 0.08em; text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .hero-eyebrow::before, .hero-eyebrow::after {
+    content: ''; display: block; width: 30px; height: 1px; background: var(--cyan); opacity: 0.4;
+  }
+  h1 {
+    font-size: clamp(2.8rem, 6vw, 4.5rem);
+    font-weight: 700; line-height: 1.05;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, var(--text) 30%, var(--cyan) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 22px;
+  }
+  .hero-desc {
+    font-size: 1.1rem; color: var(--muted); max-width: 540px; margin: 0 auto 40px;
+    line-height: 1.7;
+  }
+  .hero-links { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 26px; border-radius: 12px;
+    font-size: 0.92rem; font-weight: 600;
+    text-decoration: none; transition: all 0.25s; cursor: pointer;
+    border: none;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    color: #000;
+    box-shadow: 0 4px 24px rgba(34,211,238,0.25);
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 32px rgba(34,211,238,0.35);
+  }
+  .btn-ghost {
+    background: var(--glass); border: 1px solid var(--border); color: var(--text);
+    backdrop-filter: blur(10px);
+  }
+  .btn-ghost:hover { border-color: var(--cyan); color: var(--cyan); }
+
+  .hero-visual {
+    margin-top: 60px;
+    position: relative;
+  }
+  .hero-visual .window {
+    max-width: 900px; margin: 0 auto;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 80px rgba(0,0,0,0.5), 0 0 60px rgba(34,211,238,0.05);
+  }
+  .window-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+  }
+  .window-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+  }
+  .window-dot.red { background: #ef4444; }
+  .window-dot.yellow { background: #eab308; }
+  .window-dot.green { background: #22c55e; }
+  .window-content {
+    padding: 30px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+  }
+  .user-card {
+    background: var(--glass); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; text-align: center;
+    transition: all 0.3s;
+  }
+  .user-card:hover {
+    border-color: rgba(34,211,238,0.3);
+    transform: translateY(-2px);
+  }
+  .user-avatar {
+    width: 48px; height: 48px; border-radius: 50%;
+    margin: 0 auto 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; font-weight: 700; color: #000;
+  }
+  .user-name {
+    font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;
+  }
+  .user-status {
+    font-size: 0.72rem; color: var(--muted);
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .status-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+  .status-dot.speaking { background: var(--success); animation: pulse 1s infinite; }
+  .status-dot.muted { background: var(--danger); }
+  .status-dot.idle { background: var(--muted); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  section { padding: 80px 0; border-top: 1px solid var(--border); }
+  .section-label {
+    font-family: var(--mono); font-size: 0.72rem;
+    color: var(--cyan); letter-spacing: 0.1em; text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  h2 { font-size: 2rem; font-weight: 700; margin-bottom: 20px; letter-spacing: -0.02em; }
+  h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 14px; color: var(--text); }
+
+  .card {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    backdrop-filter: blur(10px);
+    transition: all 0.25s;
+  }
+  .card:hover { border-color: rgba(34,211,238,0.2); }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 32px;
+  }
+  .feature-icon {
+    font-size: 1.8rem; margin-bottom: 12px;
+  }
+  .feature-title {
+    font-size: 0.95rem; font-weight: 600; margin-bottom: 8px;
+  }
+  .feature-desc {
+    font-size: 0.82rem; color: var(--muted); line-height: 1.5;
+  }
+
+  .stack-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin-top: 32px;
+  }
+  .stack-item {
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 16px;
+    background: var(--glass); border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .stack-key { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .stack-val { font-size: 0.85rem; font-weight: 600; }
+
+  .testimonial-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
+    margin-top: 32px;
+  }
+  .testimonial-card {
+    padding: 24px;
+  }
+  .testimonial-text {
+    font-size: 0.9rem; color: var(--muted); line-height: 1.6;
+    font-style: italic; margin-bottom: 16px;
+  }
+  .testimonial-author {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .testimonial-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; font-weight: 700; color: #000;
+  }
+  .testimonial-name { font-size: 0.82rem; font-weight: 600; }
+  .testimonial-role { font-size: 0.72rem; color: var(--muted); }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 40px 0;
+    text-align: center;
+    font-size: 0.82rem; color: var(--muted);
+  }
+  footer a { color: var(--cyan); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  @media (max-width: 768px) {
+    .features-grid, .stack-row { grid-template-columns: 1fr; }
+    .testimonial-grid { grid-template-columns: 1fr; }
+    .nav-links { display: none; }
+    h1 { font-size: 2.2rem; }
+    .hero { padding: 100px 0 60px; }
+    .window-content { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .container { padding: 0 16px; }
+    .hero { padding: 80px 0 40px; }
+    section { padding: 50px 0; }
+    .hero-links { flex-direction: column; align-items: center; }
+    .window-content { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="inner">
+    <a href="/" class="nav-logo">
+      <div class="logo-icon">🌊</div>
+      VoiceWave
+    </a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#stack">Stack</a></li>
+      <li><a href="#testimonials">Community</a></li>
+    </ul>
+    <span class="nav-badge">v1.0.2</span>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="container">
+    <div class="hero-eyebrow">Real-Time Voice Chat</div>
+    <h1>VoiceWave</h1>
+    <p class="hero-desc">Crystal-clear real-time voice chat powered by WebRTC peer-to-peer connections. No accounts. No downloads required. Just click and talk.</p>
+    <div class="hero-links">
+      <a href="/app" class="btn btn-primary">🚀 Launch VoiceWave</a>
+      <a href="https://github.com/shaswatxd/voicewave" target="_blank" class="btn btn-ghost">⌥ View on GitHub</a>
+    </div>
+
+    <div class="hero-visual">
+      <div class="window">
+        <div class="window-bar">
+          <div class="window-dot red"></div>
+          <div class="window-dot yellow"></div>
+          <div class="window-dot green"></div>
+        </div>
+        <div class="window-content">
+          <div class="user-card">
+            <div class="user-avatar" style="background:linear-gradient(135deg,#22d3ee,#06b6d4);">A</div>
+            <div class="user-name">Alex</div>
+            <div class="user-status"><div class="status-dot speaking"></div> Speaking</div>
+          </div>
+          <div class="user-card">
+            <div class="user-avatar" style="background:linear-gradient(135deg,#a855f7,#7c3aed);">M</div>
+            <div class="user-name">Maya</div>
+            <div class="user-status"><div class="status-dot muted"></div> Muted</div>
+          </div>
+          <div class="user-card">
+            <div class="user-avatar" style="background:linear-gradient(135deg,#ec4899,#db2777);">J</div>
+            <div class="user-name">Jordan</div>
+            <div class="user-status"><div class="status-dot speaking"></div> Speaking</div>
+          </div>
+          <div class="user-card">
+            <div class="user-avatar" style="background:linear-gradient(135deg,#22c55e,#16a34a);">S</div>
+            <div class="user-name">Sam</div>
+            <div class="user-status"><div class="status-dot idle"></div> Idle</div>
+          </div>
+          <div class="user-card">
+            <div class="user-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706);">R</div>
+            <div class="user-name">Riley</div>
+            <div class="user-status"><div class="status-dot speaking"></div> Speaking</div>
+          </div>
+          <div class="user-card">
+            <div class="user-avatar" style="background:linear-gradient(135deg,#ef4444,#dc2626);">C</div>
+            <div class="user-name">Chris</div>
+            <div class="user-status"><div class="status-dot muted"></div> Muted</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section id="features">
+  <div class="container">
+    <div class="section-label">Capabilities</div>
+    <h2>Everything You Need</h2>
+    <div class="features-grid">
+      <div class="card">
+        <div class="feature-icon">🎙️</div>
+        <div class="feature-title">Peer-to-Peer Voice</div>
+        <div class="feature-desc">Direct WebRTC connections for ultra-low latency. No server relay — your voice travels directly to other participants.</div>
+      </div>
+      <div class="card">
+        <div class="feature-icon">🔒</div>
+        <div class="feature-title">Password Protected</div>
+        <div class="feature-desc">Create private rooms with passwords. Only people with the password can join your conversation.</div>
+      </div>
+      <div class="card">
+        <div class="feature-icon">💬</div>
+        <div class="feature-title">Text Chat</div>
+        <div class="feature-desc">Built-in messaging with emoji support, file sharing, and typing indicators alongside voice.</div>
+      </div>
+      <div class="card">
+        <div class="feature-icon">🎵</div>
+        <div class="feature-title">Soundboard</div>
+        <div class="feature-desc">10 built-in sounds to add fun to your conversations. Airhorn, clap, laugh, and more.</div>
+      </div>
+      <div class="card">
+        <div class="feature-icon">🎛️</div>
+        <div class="feature-title">Audio Controls</div>
+        <div class="feature-desc">Per-user volume, master volume, mic gain, noise gate, and professional audio processing.</div>
+      </div>
+      <div class="card">
+        <div class="feature-icon">📱</div>
+        <div class="feature-title">Works Everywhere</div>
+        <div class="feature-desc">PWA support, Electron desktop app, or just use your browser. No downloads required.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="stack">
+  <div class="container">
+    <div class="section-label">Architecture</div>
+    <h2>Built with Modern Tech</h2>
+    <div class="stack-row">
+      <div class="stack-item">
+        <div class="stack-key">Backend</div>
+        <div class="stack-val">Express + Socket.IO</div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-key">Frontend</div>
+        <div class="stack-val">Vanilla JS / CSS</div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-key">Desktop</div>
+        <div class="stack-val">Electron 28</div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-key">Deploy</div>
+        <div class="stack-val">Railway</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="testimonials">
+  <div class="container">
+    <div class="section-label">Community</div>
+    <h2>Loved by Users</h2>
+    <div class="testimonial-grid">
+      <div class="card testimonial-card">
+        <div class="testimonial-text">"Finally a voice chat that just works. No sign-up, no download, just click a link and you're talking. The audio quality is surprisingly good."</div>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">K</div>
+          <div>
+            <div class="testimonial-name">Kyle M.</div>
+            <div class="testimonial-role">Streamer</div>
+          </div>
+        </div>
+      </div>
+      <div class="card testimonial-card">
+        <div class="testimonial-text">"We use this for our gaming sessions. The soundboard feature is hilarious and the fact that it works on mobile too is a huge plus."</div>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">T</div>
+          <div>
+            <div class="testimonial-name">Tara L.</div>
+            <div class="testimonial-role">Gamer</div>
+          </div>
+        </div>
+      </div>
+      <div class="card testimonial-card">
+        <div class="testimonial-text">"The desktop app with system tray integration is exactly what I needed. I keep it running in the background all day for quick calls."</div>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">D</div>
+          <div>
+            <div class="testimonial-name">Dev R.</div>
+            <div class="testimonial-role">Developer</div>
+          </div>
+        </div>
+      </div>
+      <div class="card testimonial-card">
+        <div class="testimonial-text">"Love the dark theme and the glassmorphism UI. It looks modern and is easy on the eyes during long voice sessions."</div>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">N</div>
+          <div>
+            <div class="testimonial-name">Nina S.</div>
+            <div class="testimonial-role">Designer</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>
+      VoiceWave v1.0.2 · MIT License ·
+      <a href="https://github.com/shaswatxd/voicewave" target="_blank">GitHub</a> ·
+      <a href="/app" target="_blank">Launch App</a>
+    </p>
+    <p style="margin-top:8px;font-size:0.75rem;">Built by shaswatxd · Deployed on Railway</p>
+  </div>
+</footer>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>

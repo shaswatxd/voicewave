@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoiceWave</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#060a12">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app.css?v=1.0.2">
+</head>
+<body>
+
+<!-- TOAST CONTAINER -->
+<div id="toast-container"></div>
+
+<!-- LOBBY SCREEN -->
+<div id="lobby" class="screen active">
+  <div class="lobby-container">
+    <div class="lobby-header">
+      <div class="lobby-logo">🌊</div>
+      <h1>VoiceWave</h1>
+      <p>Crystal-clear real-time voice chat</p>
+    </div>
+
+    <div class="lobby-card">
+      <div class="lobby-tabs">
+        <button class="tab active" data-tab="create">Create Room</button>
+        <button class="tab" data-tab="join">Join Room</button>
+      </div>
+
+      <div class="tab-content active" id="tab-create">
+        <div class="form-group">
+          <label>Your Name</label>
+          <input type="text" id="create-name" placeholder="Enter your display name" maxlength="20">
+        </div>
+        <div class="form-group">
+          <label>Room Password (optional)</label>
+          <input type="password" id="create-password" placeholder="Leave empty for public room">
+        </div>
+        <button class="btn btn-primary full-width" id="btn-create">Create Room</button>
+      </div>
+
+      <div class="tab-content" id="tab-join">
+        <div class="form-group">
+          <label>Your Name</label>
+          <input type="text" id="join-name" placeholder="Enter your display name" maxlength="20">
+        </div>
+        <div class="form-group">
+          <label>Room Code</label>
+          <input type="text" id="join-code" placeholder="Enter 6-character code" maxlength="6" style="text-transform:uppercase;">
+        </div>
+        <div class="form-group" id="password-group" style="display:none;">
+          <label>Password</label>
+          <input type="password" id="join-password" placeholder="Enter room password">
+        </div>
+        <button class="btn btn-primary full-width" id="btn-join">Join Room</button>
+      </div>
+    </div>
+
+    <div class="feature-pills">
+      <span class="pill">🎙️ P2P Voice</span>
+      <span class="pill">💬 Chat</span>
+      <span class="pill">🎵 Soundboard</span>
+      <span class="pill">🔒 Password Rooms</span>
+      <span class="pill">📱 Works Everywhere</span>
+    </div>
+  </div>
+</div>
+
+<!-- ROOM SCREEN -->
+<div id="room" class="screen">
+  <!-- Room Header -->
+  <div class="room-header">
+    <div class="room-info">
+      <span class="room-id-label">Room: <span id="room-id-display" class="room-code"></span></span>
+      <button class="btn-icon" id="btn-copy-room" title="Copy invite link">📋</button>
+    </div>
+    <div class="room-timer" id="room-timer">00:00</div>
+    <div class="room-actions">
+      <button class="btn-icon" id="btn-invite" title="Invite">📤</button>
+      <button class="btn-icon" id="btn-settings" title="Settings">⚙️</button>
+      <button class="btn btn-danger btn-sm" id="btn-leave">Leave</button>
+    </div>
+  </div>
+
+  <div class="room-body">
+    <!-- User Grid -->
+    <div class="user-grid" id="user-grid"></div>
+
+    <!-- Chat Panel -->
+    <div class="chat-panel" id="chat-panel">
+      <div class="chat-header">
+        <h3>Chat</h3>
+        <button class="btn-icon" id="btn-close-chat">✕</button>
+      </div>
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="typing-indicator" id="typing-indicator" style="display:none;">
+        <span class="typing-dots"><span></span><span></span><span></span></span>
+        <span id="typing-user"></span> is typing...
+      </div>
+      <div class="chat-input-area">
+        <div class="emoji-bar" id="emoji-bar">
+          <button class="emoji-btn" data-emoji="😂">😂</button>
+          <button class="emoji-btn" data-emoji="❤️">❤️</button>
+          <button class="emoji-btn" data-emoji="🔥">🔥</button>
+          <button class="emoji-btn" data-emoji="👍">👍</button>
+          <button class="emoji-btn" data-emoji="😂">😭</button>
+          <button class="emoji-btn" data-emoji="💀">💀</button>
+          <button class="emoji-btn" data-emoji="✨">✨</button>
+          <button class="emoji-btn" data-emoji="🎉">🎉</button>
+        </div>
+        <div class="chat-input-row">
+          <input type="text" id="chat-input" placeholder="Type a message..." maxlength="500">
+          <button class="btn btn-primary btn-sm" id="btn-send">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Control Bar -->
+  <div class="control-bar">
+    <div class="controls-left">
+      <button class="control-btn" id="btn-mute" title="Toggle Mute (M)">
+        <span class="control-icon">🎙️</span>
+        <span class="control-label">Mute</span>
+      </button>
+      <button class="control-btn" id="btn-deafen" title="Toggle Deafen (D)">
+        <span class="control-icon">🎧</span>
+        <span class="control-label">Deafen</span>
+      </button>
+      <button class="control-btn" id="btn-hand" title="Raise Hand (H)">
+        <span class="control-icon">✋</span>
+        <span class="control-label">Hand</span>
+      </button>
+    </div>
+    <div class="controls-center">
+      <button class="control-btn" id="btn-soundboard" title="Soundboard">
+        <span class="control-icon">🎵</span>
+        <span class="control-label">Sounds</span>
+      </button>
+      <button class="control-btn" id="btn-record" title="Record Session">
+        <span class="control-icon">⏺️</span>
+        <span class="control-label">Record</span>
+      </button>
+    </div>
+    <div class="controls-right">
+      <button class="control-btn" id="btn-chat-toggle" title="Toggle Chat (C)">
+        <span class="control-icon">💬</span>
+        <span class="control-label">Chat</span>
+        <span class="badge" id="chat-badge" style="display:none;">0</span>
+      </button>
+      <button class="control-btn" id="btn-participants" title="Participants">
+        <span class="control-icon">👥</span>
+        <span class="control-label" id="participant-count">0</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- PASSWORD MODAL -->
+<div class="modal" id="password-modal">
+  <div class="modal-card">
+    <h3>Enter Password</h3>
+    <p>This room is password protected</p>
+    <input type="password" id="modal-password" placeholder="Enter password">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="modal-submit">Join</button>
+    </div>
+  </div>
+</div>
+
+<!-- SOUNDBOARD MODAL -->
+<div class="modal" id="soundboard-modal">
+  <div class="modal-card">
+    <h3>Soundboard</h3>
+    <div class="sound-grid">
+      <button class="sound-btn" data-sound="airhorn">📯 Airhorn</button>
+      <button class="sound-btn" data-sound="clap">👏 Clap</button>
+      <button class="sound-btn" data-sound="laugh">😂 Laugh</button>
+      <button class="sound-btn" data-sound="ding">🔔 Ding</button>
+      <button class="sound-btn" data-sound="bruh">💀 Bruh</button>
+      <button class="sound-btn" data-sound="sad">😢 Sad</button>
+      <button class="sound-btn" data-sound="win">🏆 Win</button>
+      <button class="sound-btn" data-sound="drum">🥁 Drum</button>
+      <button class="sound-btn" data-sound="fart">💨 Fart</button>
+      <button class="sound-btn" data-sound="pop">🎈 Pop</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="soundboard-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal" id="settings-modal">
+  <div class="modal-card modal-wide">
+    <h3>Settings</h3>
+    <div class="settings-grid">
+      <div class="setting-item">
+        <label>Master Volume</label>
+        <input type="range" id="master-volume" min="0" max="100" value="80">
+        <span class="setting-value" id="master-volume-val">80%</span>
+      </div>
+      <div class="setting-item">
+        <label>Mic Gain</label>
+        <input type="range" id="mic-gain" min="0" max="300" value="100">
+        <span class="setting-value" id="mic-gain-val">100%</span>
+      </div>
+      <div class="setting-item">
+        <label>Noise Gate Threshold</label>
+        <input type="range" id="noise-threshold" min="5" max="40" value="12">
+        <span class="setting-value" id="noise-threshold-val">12</span>
+      </div>
+      <div class="setting-item">
+        <label>Input Device</label>
+        <select id="input-device"></select>
+      </div>
+      <div class="setting-item">
+        <label>Output Device</label>
+        <select id="output-device"></select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="settings-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- KICK MODAL -->
+<div class="modal" id="kick-modal">
+  <div class="modal-card">
+    <h3>Kick User</h3>
+    <p id="kick-user-name"></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="kick-cancel">Cancel</button>
+      <button class="btn btn-danger" id="kick-confirm">Kick</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="/app.js?v=1.0.2"></script>
+</body>
+</html>

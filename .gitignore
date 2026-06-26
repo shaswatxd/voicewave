@@ -1,0 +1,7 @@
+node_modules/
+dist/
+assets/icon.png
+assets/tray.png
+assets/icon.ico
+public/icon.png
+.env
