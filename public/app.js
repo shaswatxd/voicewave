@@ -69,7 +69,7 @@
   }
 
   function generateRoomId() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
     for (let i = 0; i < 6; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
     return result;
@@ -805,7 +805,7 @@
 
     $('#btn-join').addEventListener('click', () => {
       const name = $('#join-name').value.trim();
-      const code = $('#join-code').value.trim();
+      const code = $('#join-code').value.trim().toUpperCase();
       if (!name) return toast('Enter your name', 'error');
       if (!code) return toast('Enter room code', 'error');
       window.userName = name;
@@ -822,7 +822,7 @@
 
     $('#modal-submit').addEventListener('click', () => {
       const password = $('#modal-password').value;
-      const code = $('#join-code').value.trim();
+      const code = $('#join-code').value.trim().toUpperCase();
       if (socket && socket.connected) {
         socket.emit('join-room', { roomId: code, userName: window.userName, muted: false, joinOnly: true, password });
       }
