@@ -40,6 +40,7 @@
   let isMuted = false;
   let isDeafened = false;
   let isHandRaised = false;
+  let wasMutedBeforeDeafen = false;
   let roomTimer = null;
   let roomStartTime = null;
   let chatOpen = false;
@@ -62,7 +63,10 @@
     el.className = `toast ${type}`;
     el.textContent = msg;
     $('#toast-container').appendChild(el);
-    setTimeout(() => el.remove(), 3500);
+    setTimeout(() => {
+      el.classList.add('fade-out');
+      el.addEventListener('animationend', () => el.remove());
+    }, 3200);
   }
 
   function switchScreen(screen) {
@@ -487,6 +491,9 @@
   }
 
   function connectSocket() {
+    if (socket && socket.connected) return;
+    if (socket) { socket.disconnect(); socket = null; }
+
     socket = io(window.location.origin, {
       transports: ['websocket', 'polling']
     });
@@ -581,7 +588,19 @@
 
     socket.on('peer-muted', (data) => {
       updatePeerMuted(data.socketId, data.muted);
+      // Handle force mute on self — update local state and UI
       if (data.forced && data.socketId === mySocketId) {
+        isMuted = data.muted;
+        if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+        const btn = $('#btn-mute');
+        if (btn) {
+          btn.classList.toggle('muted-state', isMuted);
+          btn.querySelector('.control-label').textContent = isMuted ? 'Unmute' : 'Mic';
+          btn.querySelector('.control-icon').innerHTML = isMuted
+            ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="2" y2="22"/><path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/><path d="M5 10v2a7 7 0 0 0 12 0"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/><line x1="12" x2="12" y1="19" y2="22"/></svg>'
+            : '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>';
+        }
+        if (window.electronAPI) window.electronAPI.updateMuteState(isMuted);
         toast(data.muted ? 'You were muted by admin' : 'You were unmuted by admin', 'info');
       }
     });
@@ -697,7 +716,7 @@
 
     el.innerHTML = `
       <div class="chat-msg-header">
-        <span class="chat-msg-name">${data.name}</span>
+        <span class="chat-msg-name">${escapeHtml(data.name)}</span>
         <span class="chat-msg-time">${time}</span>
       </div>
       <div class="chat-msg-text">${escapeHtml(data.text)}</div>
@@ -758,11 +777,16 @@
     if (!localStream) return;
     isDeafened = !isDeafened;
 
-    if (isDeafened && !isMuted) toggleMute();
-    if (!isDeafened && isMuted) toggleMute();
+    if (isDeafened) {
+      wasMutedBeforeDeafen = isMuted;
+      if (!isMuted) toggleMute();
+    } else {
+      if (!wasMutedBeforeDeafen && isMuted) toggleMute();
+    }
 
-    Object.values(peerStreams).forEach(stream => {
-      stream.getAudioTracks().forEach(t => t.enabled = !isDeafened);
+    // Use audio.volume on <audio> elements instead of disabling remote tracks
+    $$('#user-grid .user-card audio').forEach(audio => {
+      audio.volume = isDeafened ? 0 : 1;
     });
 
     const btn = $('#btn-deafen');
@@ -776,12 +800,16 @@
   }
 
   function toggleHand() {
+    if (!socket || !roomId) return;
     isHandRaised = !isHandRaised;
     socket.emit(isHandRaised ? 'raise-hand' : 'lower-hand', { roomId });
 
     const btn = $('#btn-hand');
-    btn.classList.toggle('active', isHandRaised);
-    toast(isHandRaised ? 'Hand raised' : 'Hand lowered', 'info');
+    if (btn) {
+      btn.classList.toggle('hand-raised', isHandRaised);
+      btn.querySelector('.control-icon').textContent = isHandRaised ? '✋' : '🤚';
+    }
+    toast(isHandRaised ? 'Hand raised ✋' : 'Hand lowered', 'info');
   }
 
   function startAfkTimer() {
@@ -880,9 +908,20 @@
     isMuted = false;
     isDeafened = false;
     isHandRaised = false;
+    wasMutedBeforeDeafen = false;
     isRecording = false;
     chatOpen = false;
     unreadCount = 0;
+
+    // Reset button states
+    const muteBtn = $('#btn-mute');
+    if (muteBtn) { muteBtn.classList.remove('muted-state'); muteBtn.querySelector('.control-label').textContent = 'Mic'; }
+    const deafenBtn = $('#btn-deafen');
+    if (deafenBtn) { deafenBtn.classList.remove('muted-state'); deafenBtn.querySelector('.control-label').textContent = 'Deafen'; }
+    const handBtn = $('#btn-hand');
+    if (handBtn) { handBtn.classList.remove('hand-raised'); }
+    const chatPanel = $('#chat-panel');
+    if (chatPanel) chatPanel.classList.remove('open');
 
     if (window.electronAPI) {
       window.electronAPI.updateRoomState(false);
@@ -1033,10 +1072,20 @@
       }
     });
 
-    $('#btn-leave').addEventListener('click', leaveRoom);
+    $('#btn-leave').addEventListener('click', () => {
+      $('#leave-modal').classList.add('open');
+    });
+    $('#leave-confirm').addEventListener('click', () => {
+      $('#leave-modal').classList.remove('open');
+      leaveRoom();
+    });
+    $('#leave-cancel').addEventListener('click', () => {
+      $('#leave-modal').classList.remove('open');
+    });
 
     $('#btn-mute').addEventListener('click', toggleMute);
     $('#btn-deafen').addEventListener('click', toggleDeafen);
+    $('#btn-hand').addEventListener('click', toggleHand);
 
     $('#btn-chat-toggle').addEventListener('click', toggleChat);
     $('#btn-close-chat').addEventListener('click', toggleChat);
@@ -1100,6 +1149,44 @@
       $('#noise-threshold-val').textContent = e.target.value;
     });
 
+    // Device change listeners
+    $('#input-device').addEventListener('change', async (e) => {
+      const deviceId = e.target.value;
+      if (!deviceId) return;
+      // Stop old tracks
+      if (localStream) localStream.getTracks().forEach(t => t.stop());
+      const gotMic = await getMediaStream(deviceId);
+      if (gotMic && localStream) {
+        setupAudioProcessing();
+        // Replace track in all peer connections
+        const newTrack = localStream.getAudioTracks()[0];
+        for (const [sid, peer] of Object.entries(peers)) {
+          const sender = peer.pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+          if (sender) {
+            await sender.replaceTrack(newTrack);
+          }
+        }
+        toast('Input device changed', 'success');
+      }
+    });
+
+    $('#output-device').addEventListener('change', async (e) => {
+      const deviceId = e.target.value;
+      if (!deviceId) return;
+      // Set output device on all audio elements
+      const audios = $$('#user-grid audio');
+      for (const audio of audios) {
+        if (audio.setSinkId) {
+          try {
+            await audio.setSinkId(deviceId);
+          } catch (err) {
+            console.warn('setSinkId error:', err);
+          }
+        }
+      }
+      toast('Output device changed', 'success');
+    });
+
     $$('.modal').forEach(modal => {
       modal.addEventListener('click', (e) => {
         if (e.target === modal) modal.classList.remove('open');
@@ -1141,22 +1228,16 @@
       }
     });
 
-    let peerGainNodes = {};
-
+    // Peer volume — use audio.volume directly to avoid double-audio from Web Audio API
     document.addEventListener('input', (e) => {
       if (e.target.dataset.peerVolume !== undefined) {
         const peerId = e.target.dataset.peerVolume;
-        const stream = peerStreams[peerId];
-        if (stream) {
-          if (!peerGainNodes[peerId]) {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const source = ctx.createMediaStreamSource(stream);
-            const gain = ctx.createGain();
-            source.connect(gain);
-            gain.connect(ctx.destination);
-            peerGainNodes[peerId] = { ctx, gain };
+        const card = $(`[data-socket="${peerId}"]`);
+        if (card) {
+          const audio = card.querySelector('audio');
+          if (audio) {
+            audio.volume = e.target.value / 100;
           }
-          peerGainNodes[peerId].gain.gain.value = e.target.value / 100;
         }
       }
     });
@@ -1167,6 +1248,7 @@
         case 'm': toggleMute(); break;
         case 'd': toggleDeafen(); break;
         case 'c': toggleChat(); break;
+        case 'h': toggleHand(); break;
       }
     });
 
