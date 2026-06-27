@@ -530,12 +530,6 @@
       $('#connecting-overlay').classList.remove('show');
       $('#room-id-display').textContent = roomId;
 
-      const shareLink = $('#room-share-link');
-      if (shareLink) {
-        shareLink.href = getInviteLink();
-        shareLink.textContent = getInviteLink();
-      }
-
       roomStartTime = Date.now();
       if (roomTimer) clearInterval(roomTimer);
       roomTimer = setInterval(() => {
