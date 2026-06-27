@@ -782,13 +782,14 @@
         input.placeholder = 'Send a message...';
         return;
       }
+      const fileToSend = pendingFile;
+      pendingFile = null;
       const reader = new FileReader();
       reader.onload = () => {
-        msgData.file = { name: pendingFile.name, type: pendingFile.type, data: reader.result };
+        msgData.file = { name: fileToSend.name, type: fileToSend.type, data: reader.result };
         socket.emit('chat-message', msgData);
       };
-      reader.readAsDataURL(pendingFile);
-      pendingFile = null;
+      reader.readAsDataURL(fileToSend);
     } else {
       socket.emit('chat-message', msgData);
     }
