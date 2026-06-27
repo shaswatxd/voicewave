@@ -93,13 +93,13 @@
     return name ? name.charAt(0).toUpperCase() : '?';
   }
 
-  async function getMediaStream() {
+  async function getMediaStream(deviceId) {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         toast('Microphone not available (use HTTPS)', 'error');
         return false;
       }
-      localStream = await navigator.mediaDevices.getUserMedia({
+      const constraints = {
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
@@ -108,10 +108,16 @@
           channelCount: 1,
           sampleSize: 16
         }
-      });
+      };
+      if (deviceId) {
+        constraints.audio.deviceId = { exact: deviceId };
+      }
+      localStream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log('[VoiceWave] Mic stream acquired, tracks:', localStream.getAudioTracks().map(t => t.label));
       return true;
     } catch (err) {
-      toast('Microphone access denied', 'error');
+      console.error('[VoiceWave] getUserMedia error:', err);
+      toast('Microphone access denied: ' + (err.message || err.name), 'error');
       return false;
     }
   }
@@ -141,7 +147,12 @@
   }
 
   function setupAudioProcessing() {
+    if (!localStream) return;
     audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+    // Resume AudioContext if suspended (common in Electron)
+    if (audioContext.state === 'suspended') {
+      audioContext.resume().catch(e => console.warn('[VoiceWave] AudioContext resume error:', e));
+    }
     const source = audioContext.createMediaStreamSource(localStream);
 
     micGainNode = audioContext.createGain();
@@ -192,16 +203,11 @@
 
     if (localStream) {
       localStream.getTracks().forEach(track => {
-        const transceiver = pc.addTransceiver(track, { streams: [localStream] });
-        if (track.kind === 'audio' && transceiver.setCodecPreferences) {
-          try {
-            transceiver.setCodecPreferences([
-              { mimeType: 'audio/opus', clockRate: 48000, channels: 1 },
-              { mimeType: 'audio/opus', clockRate: 48000, channels: 2 }
-            ]);
-          } catch (e) {}
-        }
+        pc.addTrack(track, localStream);
+        console.log(`[VoiceWave] Added track ${track.kind} (${track.label}) to peer ${socketId}`);
       });
+    } else {
+      console.warn(`[VoiceWave] localStream is null when creating peer connection for ${socketId}`);
     }
 
     pc.onicecandidate = (e) => {
@@ -211,17 +217,58 @@
     };
 
     pc.ontrack = (e) => {
+      console.log(`[VoiceWave] Received track from ${socketId}`, e.track.kind);
       peerStreams[socketId] = e.streams[0];
       updateUserCardAudio(socketId, e.streams[0]);
     };
 
     pc.onconnectionstatechange = () => {
+      console.log(`[VoiceWave] Peer ${socketId} connection state: ${pc.connectionState}`);
       if (pc.connectionState === 'failed') {
-        toast(`Connection to ${name} failed`, 'error');
+        toast(`Connection to ${name} failed, retrying...`, 'error');
+        // Attempt ICE restart
+        renegotiatePeer(socketId);
       }
     };
 
     return pc;
+  }
+
+  async function renegotiatePeer(socketId) {
+    const peer = peers[socketId];
+    if (!peer) return;
+    const pc = peer.pc;
+    try {
+      const offer = await pc.createOffer({ iceRestart: true });
+      await pc.setLocalDescription(offer);
+      socket.emit('offer', { to: socketId, offer: pc.localDescription });
+    } catch (err) {
+      console.error('[VoiceWave] renegotiate error:', err);
+    }
+  }
+
+  // Add tracks to peers that were created before localStream was available
+  async function addStreamToPeers() {
+    if (!localStream) return;
+    for (const [socketId, peer] of Object.entries(peers)) {
+      const pc = peer.pc;
+      const senders = pc.getSenders();
+      const hasAudioSender = senders.some(s => s.track && s.track.kind === 'audio');
+      if (!hasAudioSender) {
+        localStream.getTracks().forEach(track => {
+          pc.addTrack(track, localStream);
+          console.log(`[VoiceWave] Late-added track ${track.kind} to peer ${socketId}`);
+        });
+        // Renegotiate since we added tracks
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          socket.emit('offer', { to: socketId, offer: pc.localDescription });
+        } catch (err) {
+          console.error('[VoiceWave] Renegotiation after late track add failed:', err);
+        }
+      }
+    }
   }
 
   async function createOffer(socketId) {
@@ -245,6 +292,17 @@
     }
     const pc = peer.pc;
     try {
+      // Ensure our tracks are added before answering
+      if (localStream) {
+        const senders = pc.getSenders();
+        const hasAudioSender = senders.some(s => s.track && s.track.kind === 'audio');
+        if (!hasAudioSender) {
+          localStream.getTracks().forEach(track => {
+            pc.addTrack(track, localStream);
+            console.log(`[VoiceWave] Added track before answering offer from ${socketId}`);
+          });
+        }
+      }
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
@@ -465,16 +523,22 @@
 
       renderUserGrid(data.peers);
 
-      await getMediaStream();
-      if (localStream) {
-        setupAudioProcessing();
-        enumerateDevices();
+      // Get mic stream FIRST, then create peer connections
+      if (!localStream) {
+        const gotMic = await getMediaStream();
+        if (gotMic && localStream) {
+          setupAudioProcessing();
+          enumerateDevices();
+        } else {
+          toast('Mic not available — others won\'t hear you', 'error');
+        }
       }
 
-      data.peers.forEach(p => {
+      // Now create peer connections WITH the stream already available
+      for (const p of data.peers) {
         createPeerConnection(p.socketId, p.name);
-        createOffer(p.socketId);
-      });
+        await createOffer(p.socketId);
+      }
 
       if (window.electronAPI) {
         window.electronAPI.updateRoomState(true);
@@ -499,10 +563,14 @@
       }
     });
 
-    socket.on('peer-joined', (data) => {
+    socket.on('peer-joined', async (data) => {
       createPeerConnection(data.socketId, data.name);
       addPeerToGrid(data.socketId, data.name, data.muted, data.isCreator);
       toast(`${data.name} joined`, 'info');
+      // If we somehow don't have the stream on peer connections, add it now
+      if (localStream) {
+        await addStreamToPeers();
+      }
     });
 
     socket.on('peer-left', (data) => {

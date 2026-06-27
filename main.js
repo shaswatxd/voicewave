@@ -254,8 +254,9 @@ ipcMain.on('download-update', () => {
 });
 
 app.whenReady().then(() => {
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    const allowed = ['media', 'microphone', 'camera', 'notifications', 'mediaKeySystem'];
+  // Grant all media-related permissions automatically
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    const allowed = ['media', 'microphone', 'camera', 'notifications', 'mediaKeySystem', 'audioCapture'];
     if (allowed.includes(permission)) {
       callback(true);
     } else {
@@ -264,6 +265,13 @@ app.whenReady().then(() => {
   });
 
   session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin) => {
+    // Allow all permission checks (especially media/microphone)
+    return true;
+  });
+
+  // Handle media access requests from the renderer (Chromium-level)
+  session.defaultSession.setDevicePermissionHandler((details) => {
+    // Allow all device access (microphone, camera, etc.)
     return true;
   });
 
