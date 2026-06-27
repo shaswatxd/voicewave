@@ -188,6 +188,7 @@ async function main() {
   // Patch app.html
   patchVersion(APP_HTML, /app\.css\?v=[\d.]+/, `app.css?v=${VERSION}`);
   patchVersion(APP_HTML, /app\.js\?v=[\d.]+/, `app.js?v=${VERSION}`);
+  patchVersion(APP_HTML, /window\.APP_VERSION = '[\d.]+'/, `window.APP_VERSION = '${VERSION}'`);
 
   // Patch index.html
   patchVersion(INDEX_HTML, /v[\d.]+/g, `v${VERSION}`);

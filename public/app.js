@@ -1158,7 +1158,7 @@
           toast('Update downloaded — restart to install', 'success');
           break;
         case 'up-to-date':
-          updateLabel.textContent = 'App is up to date';
+          updateLabel.textContent = `App is up to date (v${window.APP_VERSION || '1.0.2'})`;
           updateLabel.style.color = '#6b7280';
           break;
         case 'error':
