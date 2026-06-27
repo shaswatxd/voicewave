@@ -9,7 +9,8 @@ const io = new Server(server, {
   cors: { origin: '*' },
   pingTimeout: 10000,
   pingInterval: 5000,
-  transports: ['websocket', 'polling']
+  transports: ['websocket', 'polling'],
+  maxHttpBufferSize: 4 * 1024 * 1024
 });
 
 const PORT = process.env.PORT || 3000;

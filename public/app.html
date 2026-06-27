@@ -12,7 +12,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.7">
+<link rel="stylesheet" href="/app.css?v=1.0.8">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; }
@@ -177,7 +177,7 @@
   .setting-value { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: #22d3ee; }
 
   /* Toast */
-  #toast-container { position: fixed; top: 52px; right: 16px; z-index: 300; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  #toast-container { position: fixed; top: 72px; right: 16px; z-index: 300; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
 
   /* Connecting overlay */
   .connecting-overlay { display: none; position: fixed; inset: 0; background: rgba(6,10,18,0.92); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center; flex-direction: column; gap: 24px; }
@@ -364,7 +364,7 @@
         <div class="chat-input-row">
           <input type="text" id="chat-input" placeholder="Send a message..." maxlength="500">
           <label class="btn-icon" title="Attach file" style="cursor:pointer;margin:0;">
-            <input type="file" id="chat-file-input" accept="image/*,.pdf,.zip,.txt,.mp3,.mp4" style="display:none;">
+            <input type="file" id="chat-file-input" accept="image/*,.pdf,.zip,.txt,.mp3,.webm,.ogg" style="display:none;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           </label>
           <button class="btn btn-primary btn-sm" id="btn-send">Send</button>
@@ -507,7 +507,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.7';
+  window.APP_VERSION = '1.0.8';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -515,6 +515,6 @@
     document.getElementById('tb-close').addEventListener('click', () => window.electronAPI.close());
   }
 </script>
-<script src="/app.js?v=1.0.7"></script>
+<script src="/app.js?v=1.0.8"></script>
 </body>
 </html>

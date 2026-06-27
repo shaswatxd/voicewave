@@ -507,9 +507,13 @@
       }
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
       $('#connecting-overlay').classList.remove('show');
-      toast('Disconnected from server', 'error');
+      if (reason === 'io server disconnect') {
+        toast('Disconnected by server (file too large?)', 'error');
+      } else {
+        toast('Disconnected from server', 'error');
+      }
     });
 
     socket.on('connect_error', (e) => {
@@ -980,8 +984,8 @@
     };
 
     if (pendingFile) {
-      if (pendingFile.size > 5 * 1024 * 1024) {
-        toast('File too large (max 5MB)', 'error');
+      if (pendingFile.size > 2 * 1024 * 1024) {
+        toast('File too large (max 2MB for chat)', 'error');
         pendingFile = null;
         input.value = '';
         input.placeholder = 'Send a message...';
@@ -1005,8 +1009,8 @@
   }
 
   function sendFile(file) {
-    if (file.size > 5 * 1024 * 1024) {
-      toast('File too large (max 5MB)', 'error');
+    if (file.size > 2 * 1024 * 1024) {
+      toast('File too large (max 2MB for chat)', 'error');
       return;
     }
     const reader = new FileReader();
@@ -1139,6 +1143,11 @@
     $('#chat-file-input').addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
+        if (file.size > 2 * 1024 * 1024) {
+          toast('File too large (max 2MB for chat)', 'error');
+          e.target.value = '';
+          return;
+        }
         pendingFile = file;
         const input = $('#chat-input');
         input.value = `📎 ${file.name}`;
