@@ -35,6 +35,7 @@
   let peerStreams = {};
   let mySocketId = null;
   let roomId = null;
+  let roomPassword = null;
   let isCreator = false;
   let isMuted = false;
   let isForceMuted = false;
@@ -522,11 +523,18 @@
 
     socket.on('room-joined', async (data) => {
       roomId = data.roomId;
+      roomPassword = (window._pendingJoin && window._pendingJoin.password) || null;
       isCreator = data.isCreator;
       window._iAmCreator = isCreator;
       switchScreen('room');
       $('#connecting-overlay').classList.remove('show');
       $('#room-id-display').textContent = roomId;
+
+      const shareLink = $('#room-share-link');
+      if (shareLink) {
+        shareLink.href = getInviteLink();
+        shareLink.textContent = getInviteLink();
+      }
 
       roomStartTime = Date.now();
       if (roomTimer) clearInterval(roomTimer);
@@ -922,6 +930,7 @@
     if (audioContext) audioContext.close();
     audioContext = null;
     roomId = null;
+    roomPassword = null;
     isMuted = false;
     isForceMuted = false;
     isDeafened = false;
@@ -1014,13 +1023,39 @@
     reader.readAsDataURL(file);
   }
 
+  function getInviteLink() {
+    let link = `${window.location.origin}/app?room=${roomId}`;
+    if (roomPassword) link += `&password=${encodeURIComponent(roomPassword)}`;
+    return link;
+  }
+
   function copyInviteLink() {
-    const link = `${window.location.origin}/app?room=${roomId}`;
-    navigator.clipboard.writeText(link).then(() => {
+    const link = getInviteLink();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(() => {
+        toast('Invite link copied!', 'success');
+      }).catch(() => {
+        fallbackCopy(link);
+      });
+    } else {
+      fallbackCopy(link);
+    }
+  }
+
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
       toast('Invite link copied!', 'success');
-    }).catch(() => {
+    } catch (e) {
       toast('Failed to copy link', 'error');
-    });
+    }
+    document.body.removeChild(ta);
   }
 
   function initEventListeners() {
@@ -1053,6 +1088,7 @@
     $('#btn-join').addEventListener('click', () => {
       const name = $('#join-name').value.trim();
       const code = $('#join-code').value.trim().toUpperCase();
+      const password = $('#join-password').value;
       if (!name) return toast('Enter your name', 'error');
       if (!code) return toast('Enter room code', 'error');
       window.userName = name;
@@ -1060,16 +1096,17 @@
       setTimeout(() => { if ($('#connecting-overlay').classList.contains('show')) { $('#connecting-overlay').classList.remove('show'); toast('Connection timed out', 'error'); } }, 15000);
 
       if (!socket || !socket.connected) {
-        window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: true };
+        window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: true, password };
         connectSocket();
       } else {
-        socket.emit('join-room', { roomId: code, userName: name, muted: false, joinOnly: true });
+        socket.emit('join-room', { roomId: code, userName: name, muted: false, joinOnly: true, password });
       }
     });
 
     $('#modal-submit').addEventListener('click', () => {
       const password = $('#modal-password').value;
       const code = $('#join-code').value.trim().toUpperCase();
+      window._pendingJoin = { roomId: code, userName: window.userName, muted: false, joinOnly: true, password };
       if (socket && socket.connected) {
         socket.emit('join-room', { roomId: code, userName: window.userName, muted: false, joinOnly: true, password });
       }
@@ -1298,8 +1335,13 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
+    const passParam = urlParams.get('password');
     if (roomParam) {
       $('#join-code').value = roomParam;
+      if (passParam) {
+        $('#password-group').style.display = 'block';
+        $('#join-password').value = passParam;
+      }
       $$('.tab').forEach(t => t.classList.remove('active'));
       $$('.tab-content').forEach(c => c.classList.remove('active'));
       $('[data-tab="join"]').classList.add('active');

@@ -12,7 +12,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.14">
+<link rel="stylesheet" href="/app.css?v=1.0.15">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; }
@@ -20,7 +20,7 @@
   .screen { display: none; width: 100%; height: 100dvh; height: 100vh; }
   .screen.active { display: flex !important; flex-direction: column !important; }
 
-  #lobby.active { justify-content: flex-start; align-items: center; padding-top: 4vh; }
+  #lobby.active { justify-content: flex-start; align-items: center; padding-top: 2vh; }
 
   /* ROOM LAYOUT - Discord style */
   #room.active { background: #060a12; padding-bottom: env(safe-area-inset-bottom, 8px); }
@@ -476,6 +476,15 @@
         <select id="output-device"></select>
       </div>
     </div>
+    <div style="margin-top:16px;padding:12px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          <span style="font-size:0.82rem;color:#d1d5db;">Share this link to invite</span>
+        </div>
+        <a id="room-share-link" href="#" target="_blank" style="font-size:0.78rem;color:#22d3ee;text-decoration:none;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;"></a>
+      </div>
+    </div>
     <div class="modal-actions" style="margin-top:20px;">
       <button class="btn btn-ghost" id="btn-record" title="Record Session">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
@@ -512,7 +521,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.14';
+  window.APP_VERSION = '1.0.15';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -520,6 +529,6 @@
     document.getElementById('tb-close').addEventListener('click', () => window.electronAPI.close());
   }
 </script>
-<script src="/app.js?v=1.0.14"></script>
+<script src="/app.js?v=1.0.15"></script>
 </body>
 </html>

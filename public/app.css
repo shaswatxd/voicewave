@@ -61,7 +61,7 @@ body {
   width: 100%; height: 100vh;
   display: flex; flex-direction: column;
   align-items: center; justify-content: flex-start;
-  padding: 4vh 24px;
+  padding: 2vh 24px;
   position: relative;
   overflow-y: auto;
 }
@@ -73,25 +73,25 @@ body {
   pointer-events: none;
 }
 .lobby-header {
-  text-align: center; margin-bottom: 32px;
+  text-align: center; margin-bottom: 18px;
 }
 .lobby-logo {
-  font-size: 3rem; margin-bottom: 12px;
+  font-size: 2.2rem; margin-bottom: 6px;
 }
 .lobby-header h1 {
-  font-size: 2rem; font-weight: 700;
+  font-size: 1.5rem; font-weight: 700;
   background: linear-gradient(135deg, var(--text) 30%, var(--cyan) 100%);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 .lobby-header p {
-  color: var(--muted); font-size: 0.9rem; margin-top: 6px;
+  color: var(--muted); font-size: 0.8rem; margin-top: 4px;
 }
 .lobby-card {
   background: var(--glass);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 28px;
+  padding: 32px 28px;
   width: 100%; max-width: 400px;
   backdrop-filter: blur(20px);
 }
@@ -600,9 +600,9 @@ body {
   .user-name { font-size: 0.8rem; }
   .user-volume input[type="range"] { height: 6px; }
   .lobby-card { padding: 20px; border-radius: 12px; }
-  .lobby-header { margin-bottom: 24px; }
-  .lobby-logo { font-size: 2.4rem; }
-  .lobby-header h1 { font-size: 1.5rem; }
+  .lobby-header { margin-bottom: 14px; }
+  .lobby-logo { font-size: 1.8rem; }
+  .lobby-header h1 { font-size: 1.3rem; }
   .tab { padding: 12px 8px; font-size: 0.8rem; min-height: 44px; }
   .form-group input { padding: 14px; font-size: 1rem; min-height: 48px; }
   .btn { min-height: 48px; padding: 12px 20px; }
