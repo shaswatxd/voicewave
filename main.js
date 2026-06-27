@@ -3,6 +3,7 @@ const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+app.commandLine.appendSwitch('enable-media-stream');
 
 let mainWindow;
 let tray;
@@ -25,7 +26,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: true
+      webSecurity: false,
+      allowRunningInsecureContent: false,
+      spellcheck: false
     },
     backgroundColor: '#060a12',
     show: false

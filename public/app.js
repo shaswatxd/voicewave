@@ -489,10 +489,12 @@
     socket.on('room-full', () => { $('#connecting-overlay').classList.remove('show'); toast('Room is full (max 30)', 'error'); });
     socket.on('room-warning', (data) => toast(data.message, 'info'));
     socket.on('room-requires-password', () => {
+      $('#connecting-overlay').classList.remove('show');
       $('#password-modal').classList.add('open');
     });
     socket.on('room-has-password', (data) => {
       if (data.hasPassword) {
+        $('#connecting-overlay').classList.remove('show');
         $('#password-modal').classList.add('open');
       }
     });
@@ -939,6 +941,8 @@
         socket.emit('join-room', { roomId: code, userName: window.userName, muted: false, joinOnly: true, password });
       }
       $('#password-modal').classList.remove('open');
+      $('#connecting-overlay').classList.add('show');
+      setTimeout(() => { if ($('#connecting-overlay').classList.contains('show')) { $('#connecting-overlay').classList.remove('show'); toast('Connection timed out', 'error'); } }, 15000);
     });
 
     $('#modal-cancel').addEventListener('click', () => {
