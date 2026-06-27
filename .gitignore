@@ -5,3 +5,4 @@ assets/tray.png
 assets/icon.ico
 public/icon.png
 .env
+*-player-script.js
