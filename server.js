@@ -18,15 +18,6 @@ const WARN_USERS = 15;
 
 const rooms = new Map();
 
-function generateRoomId() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
 app.use(express.static(path.join(__dirname, 'public'), { noCache: true }));
 
 app.get('/', (req, res) => {
@@ -45,6 +36,11 @@ io.on('connection', (socket) => {
   console.log(`[Connect] ${socket.id}`);
 
   socket.on('join-room', ({ roomId, userName, muted, joinOnly, password }) => {
+    if (!roomId || !userName || roomId.length > 10 || userName.length > 32) {
+      socket.emit('room-not-found', { roomId });
+      return;
+    }
+
     let room = rooms.get(roomId);
 
     if (!room) {
@@ -63,6 +59,11 @@ io.on('connection', (socket) => {
     }
 
     if (room.password && room.password !== password && joinOnly) {
+      socket.emit('room-requires-password', { roomId });
+      return;
+    }
+
+    if (room.password && room.password !== password && !joinOnly) {
       socket.emit('room-requires-password', { roomId });
       return;
     }

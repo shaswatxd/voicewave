@@ -29,7 +29,6 @@
   let localStream = null;
   let audioContext = null;
   let micGainNode = null;
-  let noiseGateNode = null;
   let analyserNode = null;
   let masterGainNode = null;
   let peers = {};
@@ -38,6 +37,7 @@
   let roomId = null;
   let isCreator = false;
   let isMuted = false;
+  let isForceMuted = false;
   let isDeafened = false;
   let isHandRaised = false;
   let wasMutedBeforeDeafen = false;
@@ -376,8 +376,8 @@
     const initial = getInitial(name);
 
     card.innerHTML = `
-      <div class="user-avatar" style="background:${avatarColor};">${initial}</div>
-      <div class="user-name">${name}${isLocal ? ' (You)' : ''}</div>
+      <div class="user-avatar" style="background:${avatarColor};">${escapeHtml(initial)}</div>
+      <div class="user-name">${escapeHtml(name)}${isLocal ? ' (You)' : ''}</div>
       <div class="user-status">
         <div class="status-dot ${muted ? 'muted' : 'idle'}"></div>
         ${muted ? 'Muted' : 'Connected'}
@@ -451,10 +451,10 @@
     finalList.forEach(p => {
       const item = document.createElement('div');
       item.className = 'pd-item';
-      const dotClass = p.muted ? 'muted' : (p.socketId === mySocketId && !isMuted ? 'idle' : 'idle');
+      const dotClass = p.muted ? 'muted' : 'idle';
       item.innerHTML = `
         <div class="pd-dot ${dotClass}"></div>
-        <div class="pd-name">${p.name}${p.isLocal ? '<span class="pd-you">(You)</span>' : ''}</div>
+        <div class="pd-name">${escapeHtml(p.name)}${p.isLocal ? '<span class="pd-you">(You)</span>' : ''}</div>
         ${p.isCreator ? '<span class="pd-admin">Admin</span>' : ''}
       `;
       list.appendChild(item);
@@ -501,6 +501,10 @@
     socket.on('connect', () => {
       mySocketId = socket.id;
       toast('Connected to server', 'success');
+      if (window._pendingJoin) {
+        socket.emit('join-room', window._pendingJoin);
+        window._pendingJoin = null;
+      }
     });
 
     socket.on('disconnect', () => {
@@ -590,6 +594,7 @@
       updatePeerMuted(data.socketId, data.muted);
       // Handle force mute on self — update local state and UI
       if (data.forced && data.socketId === mySocketId) {
+        isForceMuted = data.muted;
         isMuted = data.muted;
         if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
         const btn = $('#btn-mute');
@@ -619,6 +624,9 @@
         const cardIsLocal = sid === mySocketId;
         const newCard = createUserCard(sid, name, muted, cardIsCreator, cardIsLocal);
         card.replaceWith(newCard);
+        if (peerStreams[sid]) {
+          updateUserCardAudio(sid, peerStreams[sid]);
+        }
       });
     });
 
@@ -676,6 +684,19 @@
           const dot = status.querySelector('.status-dot');
           if (dot) dot.className = `status-dot ${data.afk ? 'idle' : 'idle'}`;
         }
+        const statusIcons = card.querySelector('.user-status-icons');
+        if (statusIcons) {
+          const existingAfk = statusIcons.querySelector('.afk-icon');
+          if (data.afk && !existingAfk) {
+            const span = document.createElement('span');
+            span.className = 'status-icon afk-icon';
+            span.style.color = '#f59e0b';
+            span.textContent = 'AFK';
+            statusIcons.appendChild(span);
+          } else if (!data.afk && existingAfk) {
+            existingAfk.remove();
+          }
+        }
       }
     });
 
@@ -683,7 +704,10 @@
       toast(`${peers[data.socketId]?.name || 'Someone'} raised their hand`, 'info');
     });
 
-    socket.on('peer-hand-lowered', () => {});
+    socket.on('peer-hand-lowered', (data) => {
+      const name = peers[data.socketId]?.name || 'Someone';
+      toast(`${name} lowered hand`, 'info');
+    });
 
     socket.on('peer-soundboard-play', (data) => {
       const name = peers[data.socketId]?.name || 'Someone';
@@ -710,7 +734,7 @@
       if (data.file.type?.startsWith('image/')) {
         fileHtml = `<div style="margin-top:8px;"><img src="${data.file.data}" style="max-width:100%;border-radius:10px;border:1px solid rgba(255,255,255,0.06);" /></div>`;
       } else {
-        fileHtml = `<div class="chat-msg-file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><a href="${data.file.data}" download="${data.file.name}">${data.file.name}</a></div>`;
+        fileHtml = `<div class="chat-msg-file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><a href="${data.file.data}" download="${escapeHtml(data.file.name)}">${escapeHtml(data.file.name)}</a></div>`;
       }
     }
 
@@ -756,6 +780,10 @@
 
   function toggleMute() {
     if (!localStream) return;
+    if (isForceMuted) {
+      toast('You are muted by admin', 'error');
+      return;
+    }
     isMuted = !isMuted;
     localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
     socket.emit('user-muted', { roomId, muted: isMuted });
@@ -830,6 +858,8 @@
     resetAfk();
   }
 
+  let soundAudioCtx = null;
+
   function playSound(soundId) {
     const frequencies = {
       airhorn: 440, clap: 800, laugh: 600, ding: 1000,
@@ -837,17 +867,18 @@
       fart: 200, pop: 600
     };
     const freq = frequencies[soundId] || 440;
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    if (!soundAudioCtx) soundAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (soundAudioCtx.state === 'suspended') soundAudioCtx.resume();
+    const osc = soundAudioCtx.createOscillator();
+    const gain = soundAudioCtx.createGain();
     osc.frequency.value = freq;
     osc.type = soundId === 'drum' ? 'square' : 'sine';
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+    gain.gain.setValueAtTime(0.3, soundAudioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, soundAudioCtx.currentTime + 0.5);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(soundAudioCtx.destination);
     osc.start();
-    osc.stop(ctx.currentTime + 0.5);
+    osc.stop(soundAudioCtx.currentTime + 0.5);
 
     socket.emit('soundboard-play', { roomId, soundId });
   }
@@ -870,7 +901,7 @@
       a.href = url;
       a.download = `voicewave-${roomId}-${Date.now()}.webm`;
       a.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
     mediaRecorder.start();
     isRecording = true;
@@ -895,6 +926,9 @@
     }
     if (roomTimer) clearInterval(roomTimer);
     if (pollInterval) clearInterval(pollInterval);
+    if (afkTimeout) clearTimeout(afkTimeout);
+    if (typingTimeout) clearTimeout(typingTimeout);
+    if (speakingTimeout) clearTimeout(speakingTimeout);
     if (mediaRecorder && isRecording) mediaRecorder.stop();
 
     Object.values(peers).forEach(p => p.pc.close());
@@ -906,6 +940,7 @@
     audioContext = null;
     roomId = null;
     isMuted = false;
+    isForceMuted = false;
     isDeafened = false;
     isHandRaised = false;
     wasMutedBeforeDeafen = false;
@@ -1016,10 +1051,8 @@
       const password = $('#create-password').value;
       $('#connecting-overlay').classList.add('show');
       setTimeout(() => { if ($('#connecting-overlay').classList.contains('show')) { $('#connecting-overlay').classList.remove('show'); toast('Connection timed out', 'error'); } }, 15000);
+      window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: false, password };
       connectSocket();
-      socket.on('connect', () => {
-        socket.emit('join-room', { roomId: code, userName: name, muted: false, joinOnly: false, password });
-      });
     });
 
     $('#btn-join').addEventListener('click', () => {
@@ -1032,10 +1065,8 @@
       setTimeout(() => { if ($('#connecting-overlay').classList.contains('show')) { $('#connecting-overlay').classList.remove('show'); toast('Connection timed out', 'error'); } }, 15000);
 
       if (!socket || !socket.connected) {
+        window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: true };
         connectSocket();
-        socket.on('connect', () => {
-          socket.emit('join-room', { roomId: code, userName: name, muted: false, joinOnly: true });
-        });
       } else {
         socket.emit('join-room', { roomId: code, userName: name, muted: false, joinOnly: true });
       }
@@ -1099,6 +1130,7 @@
     });
 
     $('#chat-input').addEventListener('input', () => {
+      if (!socket || !roomId) return;
       socket.emit('typing-start', { roomId });
       clearTimeout(typingTimeout);
       typingTimeout = setTimeout(() => socket.emit('typing-stop', { roomId }), 2000);
