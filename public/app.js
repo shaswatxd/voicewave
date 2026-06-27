@@ -280,7 +280,7 @@
 
   function createUserCard(socketId, name, muted, isCreator, isLocal) {
     const card = document.createElement('div');
-    card.className = `user-card ${muted ? 'muted' : ''}`;
+    card.className = `user-card ${muted ? 'muted' : ''} ${isCreator ? 'is-admin' : ''}`;
     card.dataset.socket = socketId;
     card.dataset.name = name;
 
@@ -296,7 +296,7 @@
       </div>
       <div class="user-status-icons">
         ${muted ? '<span class="status-icon" style="color:#ef4444;">Muted</span>' : ''}
-        ${isCreator ? '<span class="status-icon" style="background:rgba(34,211,238,0.1);color:#22d3ee;">Admin</span>' : ''}
+        ${isCreator ? '<span class="status-icon admin-badge">Admin</span>' : ''}
       </div>
       <div class="audio-meter">
         <div class="meter-bar"></div>
@@ -305,7 +305,7 @@
         <div class="meter-bar"></div>
         <div class="meter-bar"></div>
       </div>
-      ${!isLocal && isCreator ? `<div class="user-kick" data-kick="${socketId}" title="Kick user">✕</div>` : ''}
+      ${!isLocal && isCreator ? `<div class="user-actions"><div class="user-kick" data-kick="${socketId}" title="Kick user">✕</div><div class="user-mute-btn" data-force-mute="${socketId}" title="${muted ? 'Unmute user' : 'Mute user'}">${muted ? '🔇' : '🔊'}</div></div>` : ''}
       ${!isLocal ? `<div class="user-volume"><input type="range" min="0" max="100" value="80" data-peer-volume="${socketId}"></div>` : ''}
     `;
 
@@ -442,6 +442,9 @@
 
     socket.on('peer-muted', (data) => {
       updatePeerMuted(data.socketId, data.muted);
+      if (data.forced && data.socketId === mySocketId) {
+        toast(data.muted ? 'You were muted by admin' : 'You were unmuted by admin', 'info');
+      }
     });
 
     socket.on('new-creator', (data) => {
@@ -529,15 +532,15 @@
     const time = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const el = document.createElement('div');
-    el.className = 'chat-msg';
+    el.className = `chat-msg${isOwn ? ' own' : ''}`;
     el.dataset.msgid = data.msgId;
 
     let fileHtml = '';
     if (data.file) {
       if (data.file.type?.startsWith('image/')) {
-        fileHtml = `<div style="margin-top:6px;"><img src="${data.file.data}" style="max-width:100%;border-radius:6px;" /></div>`;
+        fileHtml = `<div style="margin-top:8px;"><img src="${data.file.data}" style="max-width:100%;border-radius:10px;border:1px solid rgba(255,255,255,0.06);" /></div>`;
       } else {
-        fileHtml = `<div style="margin-top:6px;"><a href="${data.file.data}" download="${data.file.name}" style="color:var(--cyan);font-size:0.78rem;">📎 ${data.file.name}</a></div>`;
+        fileHtml = `<div class="chat-msg-file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><a href="${data.file.data}" download="${data.file.name}">${data.file.name}</a></div>`;
       }
     }
 
@@ -835,7 +838,6 @@
       $('#password-modal').classList.remove('open');
     });
 
-    $('#btn-copy-room').addEventListener('click', copyInviteLink);
     $('#btn-invite').addEventListener('click', copyInviteLink);
 
     $('#btn-leave').addEventListener('click', leaveRoom);
@@ -858,6 +860,14 @@
       socket.emit('typing-start', { roomId });
       clearTimeout(typingTimeout);
       typingTimeout = setTimeout(() => socket.emit('typing-stop', { roomId }), 2000);
+    });
+
+    $('#chat-file-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        sendFile(file);
+        e.target.value = '';
+      }
     });
 
     $$('.emoji-btn').forEach(btn => {
@@ -913,6 +923,18 @@
         };
         $('#kick-cancel').onclick = () => $('#kick-modal').classList.remove('open');
         $('#kick-modal').classList.add('open');
+      }
+
+      const muteBtn = e.target.closest('[data-force-mute]');
+      if (muteBtn) {
+        const targetId = muteBtn.dataset.forceMute;
+        const card = $(`[data-socket="${targetId}"]`);
+        const isMuted = card?.classList.contains('muted');
+        if (isMuted) {
+          socket.emit('force-unmute', { roomId, targetId });
+        } else {
+          socket.emit('force-mute', { roomId, targetId });
+        }
       }
     });
 

@@ -188,6 +188,22 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('force-mute', ({ roomId, targetId }) => {
+    const room = rooms.get(roomId);
+    if (room && room.creator === socket.id && room.users.has(targetId)) {
+      room.users.get(targetId).muted = true;
+      io.to(roomId).emit('peer-muted', { socketId: targetId, muted: true, forced: true });
+    }
+  });
+
+  socket.on('force-unmute', ({ roomId, targetId }) => {
+    const room = rooms.get(roomId);
+    if (room && room.creator === socket.id && room.users.has(targetId)) {
+      room.users.get(targetId).muted = false;
+      io.to(roomId).emit('peer-muted', { socketId: targetId, muted: false, forced: true });
+    }
+  });
+
   socket.on('leave-room', ({ roomId }) => {
     handleLeave(socket, roomId);
   });
