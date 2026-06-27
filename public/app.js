@@ -439,7 +439,13 @@
     });
 
     socket.on('disconnect', () => {
+      $('#connecting-overlay').classList.remove('show');
       toast('Disconnected from server', 'error');
+    });
+
+    socket.on('connect_error', (e) => {
+      $('#connecting-overlay').classList.remove('show');
+      toast('Connection failed — check internet', 'error');
     });
 
     socket.on('room-joined', async (data) => {
@@ -887,6 +893,7 @@
       const code = generateRoomId();
       const password = $('#create-password').value;
       $('#connecting-overlay').classList.add('show');
+      setTimeout(() => { if ($('#connecting-overlay').classList.contains('show')) { $('#connecting-overlay').classList.remove('show'); toast('Connection timed out', 'error'); } }, 15000);
       connectSocket();
       socket.on('connect', () => {
         socket.emit('join-room', { roomId: code, userName: name, muted: false, joinOnly: false, password });
@@ -900,6 +907,7 @@
       if (!code) return toast('Enter room code', 'error');
       window.userName = name;
       $('#connecting-overlay').classList.add('show');
+      setTimeout(() => { if ($('#connecting-overlay').classList.contains('show')) { $('#connecting-overlay').classList.remove('show'); toast('Connection timed out', 'error'); } }, 15000);
 
       if (!socket || !socket.connected) {
         connectSocket();
@@ -1092,6 +1100,65 @@
       $('[data-tab="join"]').classList.add('active');
       $('#tab-join').classList.add('active');
     }
+  }
+
+  if (window.electronAPI && window.electronAPI.isElectron) {
+    const updateSection = $('#update-section');
+    const updateLabel = $('#update-label');
+    const btnDownload = $('#btn-download-update');
+    const btnInstall = $('#btn-install-update');
+    const progressBar = $('#update-progress-bar');
+    const progressFill = $('#update-progress-fill');
+    const progressText = $('#update-progress-text');
+
+    window.electronAPI.onUpdateStatus((data) => {
+      updateSection.style.display = 'block';
+      switch (data.status) {
+        case 'checking':
+          updateLabel.textContent = 'Checking for updates...';
+          break;
+        case 'available':
+          updateLabel.textContent = `Update v${data.version} available`;
+          updateLabel.style.color = '#22d3ee';
+          btnDownload.style.display = 'inline-flex';
+          btnInstall.style.display = 'none';
+          progressBar.style.display = 'none';
+          progressText.style.display = 'none';
+          toast(`Update v${data.version} available!`, 'info');
+          break;
+        case 'downloading':
+          updateLabel.textContent = 'Downloading update...';
+          updateLabel.style.color = '#d1d5db';
+          btnDownload.style.display = 'none';
+          progressBar.style.display = 'block';
+          progressText.style.display = 'block';
+          progressFill.style.width = data.percent + '%';
+          progressText.textContent = data.percent + '%';
+          break;
+        case 'ready':
+          updateLabel.textContent = 'Update ready to install';
+          updateLabel.style.color = '#22c55e';
+          btnInstall.style.display = 'inline-flex';
+          btnDownload.style.display = 'none';
+          progressBar.style.display = 'none';
+          progressText.style.display = 'none';
+          toast('Update downloaded — restart to install', 'success');
+          break;
+        case 'up-to-date':
+          updateLabel.textContent = 'App is up to date';
+          updateLabel.style.color = '#6b7280';
+          break;
+        case 'error':
+          updateLabel.textContent = 'Update check failed';
+          updateLabel.style.color = '#ef4444';
+          break;
+      }
+    });
+
+    btnDownload.addEventListener('click', () => window.electronAPI.downloadUpdate());
+    btnInstall.addEventListener('click', () => window.electronAPI.installUpdate());
+
+    window.electronAPI.checkForUpdates();
   }
 
   document.addEventListener('DOMContentLoaded', initEventListeners);

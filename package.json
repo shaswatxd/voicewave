@@ -15,6 +15,11 @@
   "build": {
     "appId": "com.shaswatxd.voicewave",
     "productName": "VoiceWave",
+    "publish": {
+      "provider": "github",
+      "owner": "shaswatxd",
+      "repo": "voicewave"
+    },
     "directories": {
       "output": "dist"
     },
@@ -28,7 +33,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.ico",
@@ -45,6 +52,7 @@
     }
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "express": "^4.18.2",
     "socket.io": "^4.7.2"
   },

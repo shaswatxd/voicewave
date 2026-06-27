@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage } = require('electron');
 const path = require('path');
+const { autoUpdater } = require('electron-updater');
 
 let mainWindow;
 let tray;
@@ -203,9 +204,54 @@ ipcMain.on('update-room-state', (event, inRoomState) => {
   updateTrayMenu();
 });
 
+// ── AUTO UPDATER ──
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
+function setupAutoUpdater() {
+  autoUpdater.on('checking-for-update', () => {
+    if (mainWindow) mainWindow.webContents.send('update-status', { status: 'checking' });
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    if (mainWindow) mainWindow.webContents.send('update-status', { status: 'available', version: info.version });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    if (mainWindow) mainWindow.webContents.send('update-status', { status: 'up-to-date' });
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    if (mainWindow) mainWindow.webContents.send('update-status', { status: 'downloading', percent: Math.round(progress.percent) });
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    if (mainWindow) mainWindow.webContents.send('update-status', { status: 'ready' });
+  });
+
+  autoUpdater.on('error', () => {
+    if (mainWindow) mainWindow.webContents.send('update-status', { status: 'error' });
+  });
+
+  setTimeout(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 5000);
+}
+
+ipcMain.on('check-for-updates', () => {
+  autoUpdater.checkForUpdates().catch(() => {});
+});
+
+ipcMain.on('install-update', () => {
+  autoUpdater.quitAndInstall();
+});
+
+ipcMain.on('download-update', () => {
+  autoUpdater.downloadUpdate().catch(() => {});
+});
+
 app.whenReady().then(() => {
   createWindow();
   createTray();
+  setupAutoUpdater();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

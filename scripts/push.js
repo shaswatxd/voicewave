@@ -244,7 +244,7 @@ async function main() {
   // ── STEP 13: Build Electron ──
   log('Step 13: Building Electron app...');
   if (process.platform === 'win32') {
-    run('npx electron-builder --win --x64');
+    run('npx electron-builder --win --x64 --publish always');
   } else {
     run('npx electron-builder --linux --x64');
   }
