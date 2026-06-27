@@ -12,7 +12,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.6">
+<link rel="stylesheet" href="/app.css?v=1.0.7">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; }
@@ -167,7 +167,7 @@
   .sound-btn { padding: 12px; text-align: center; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; cursor: pointer; color: #f0f4ff; font-size: 0.85rem; font-family: inherit; transition: all 0.2s; }
   .sound-btn:hover { border-color: #22d3ee; background: rgba(34,211,238,0.05); }
   .sound-btn:active { transform: scale(0.95); }
-  .settings-grid { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; }
+  .settings-grid { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; max-width: 360px; }
   #btn-record.active { background: rgba(239,68,68,0.15); color: #ef4444; border-color: rgba(239,68,68,0.3); }
   .setting-item label { display: block; font-size: 0.78rem; font-weight: 600; color: #8b9ab8; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
   .setting-item input[type="range"] { width: 100%; height: 4px; -webkit-appearance: none; background: rgba(255,255,255,0.08); border-radius: 2px; outline: none; }
@@ -177,7 +177,7 @@
   .setting-value { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: #22d3ee; }
 
   /* Toast */
-  #toast-container { position: fixed; top: 48px; right: 12px; z-index: 300; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  #toast-container { position: fixed; top: 52px; right: 16px; z-index: 300; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
 
   /* Connecting overlay */
   .connecting-overlay { display: none; position: fixed; inset: 0; background: rgba(6,10,18,0.92); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center; flex-direction: column; gap: 24px; }
@@ -194,7 +194,7 @@
   .toast.success { border-color: rgba(34,197,94,0.3); }
   .toast.error { border-color: rgba(239,68,68,0.3); }
   .toast.info { border-color: rgba(34,211,238,0.3); }
-  @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(12px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
   /* Recording */
   .recording-indicator { position: fixed; top: 50px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25); border-radius: 20px; font-size: 0.78rem; font-weight: 600; color: #ef4444; z-index: 50; }
@@ -507,7 +507,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.6';
+  window.APP_VERSION = '1.0.7';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -515,6 +515,6 @@
     document.getElementById('tb-close').addEventListener('click', () => window.electronAPI.close());
   }
 </script>
-<script src="/app.js?v=1.0.6"></script>
+<script src="/app.js?v=1.0.7"></script>
 </body>
 </html>
