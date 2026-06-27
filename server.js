@@ -10,7 +10,7 @@ const io = new Server(server, {
   pingTimeout: 10000,
   pingInterval: 5000,
   transports: ['websocket', 'polling'],
-  maxHttpBufferSize: 50 * 1024 * 1024
+  maxHttpBufferSize: 110 * 1024 * 1024
 });
 
 const PORT = process.env.PORT || 3000;
@@ -169,14 +169,6 @@ io.on('connection', (socket) => {
 
   socket.on('afk-status', ({ roomId, afk }) => {
     socket.to(roomId).emit('peer-afk', { socketId: socket.id, afk });
-  });
-
-  socket.on('raise-hand', ({ roomId }) => {
-    socket.to(roomId).emit('peer-hand-raised', { socketId: socket.id });
-  });
-
-  socket.on('lower-hand', ({ roomId }) => {
-    socket.to(roomId).emit('peer-hand-lowered', { socketId: socket.id });
   });
 
   socket.on('soundboard-play', ({ roomId, soundId }) => {

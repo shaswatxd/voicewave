@@ -385,10 +385,6 @@ body {
   background: rgba(34,211,238,0.12);
   color: var(--cyan);
 }
-.control-btn.hand-raised {
-  background: rgba(250,204,21,0.15);
-  color: #facc15;
-}
 .control-btn.muted-state {
   background: rgba(239,68,68,0.12);
   color: var(--danger);
@@ -615,10 +611,19 @@ body {
   .control-btn { padding: 8px 10px; border-radius: 8px; }
   .control-icon { font-size: 1rem; }
   .room-header { padding: 8px 10px; }
-  .chat-input-row { gap: 6px; }
-  .chat-input-row input { padding: 12px; min-height: 44px; font-size: 0.9rem; }
-  .chat-input-row .btn { min-height: 44px; padding: 8px 12px; }
-  .emoji-btn { width: 36px; height: 36px; min-width: 36px; min-height: 36px; font-size: 1rem; }
+  .chat-panel.open { width: 100%; height: 100%; position: fixed; inset: 0; z-index: 150; border-radius: 0; border: none; }
+  .chat-panel .chat-header { padding: 14px 16px; min-height: 52px; }
+  .chat-panel .chat-header h3 { font-size: 1rem; }
+  .chat-panel .chat-messages { padding: 10px 12px; gap: 6px; }
+  .chat-panel .chat-msg { padding: 10px 14px; border-radius: 12px; }
+  .chat-panel .chat-msg-text { font-size: 0.88rem; line-height: 1.5; }
+  .chat-panel .chat-msg-name { font-size: 0.8rem; }
+  .chat-panel .chat-msg-time { font-size: 0.65rem; }
+  .chat-panel .chat-input-area { padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .chat-input-row { gap: 8px; }
+  .chat-input-row input { padding: 12px 14px; min-height: 46px; font-size: 0.95rem; border-radius: 12px; }
+  .chat-input-row .btn { min-height: 46px; padding: 10px 14px; border-radius: 12px; }
+  .typing-indicator { padding: 8px 14px; font-size: 0.78rem; }
   .modal-card { padding: 20px; width: 92%; border-radius: 16px; }
   .modal-card h3 { font-size: 1rem; }
   .modal-card input, .modal-card select { padding: 12px; min-height: 48px; font-size: 1rem; }

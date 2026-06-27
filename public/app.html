@@ -12,7 +12,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.12">
+<link rel="stylesheet" href="/app.css?v=1.0.13">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; }
@@ -212,7 +212,15 @@
 
   /* Mobile responsive */
   @media (max-width: 768px) {
-    .chat-panel.open { width: 100%; border-left: none; border-radius: 0; }
+    .chat-panel.open { width: 100%; height: 100%; position: fixed; inset: 0; z-index: 150; border-left: none; border-radius: 0; border: none; }
+    .chat-panel .chat-header { padding: 14px 16px; min-height: 52px; }
+    .chat-panel .chat-header h3 { font-size: 1rem; }
+    .chat-panel .chat-messages { padding: 10px 12px; gap: 6px; }
+    .chat-panel .chat-msg { padding: 10px 14px; border-radius: 12px; }
+    .chat-panel .chat-msg-text { font-size: 0.88rem; line-height: 1.5; }
+    .chat-panel .chat-input-area { padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+    .chat-input-row input { padding: 12px 14px; min-height: 46px; font-size: 0.95rem; border-radius: 12px; }
+    .chat-input-row .btn { min-height: 46px; padding: 10px 14px; border-radius: 12px; }
     .user-actions { opacity: 1; }
     .emoji-bar { display: none !important; }
   }
@@ -389,11 +397,6 @@
         </span>
         <span class="control-label">Deafen</span>
       </button>
-
-      <button class="control-btn" id="btn-hand" title="Raise Hand (H)">
-        <span class="control-icon">✋</span>
-        <span class="control-label">Hand</span>
-      </button>
     </div>
 
     <div class="controls-right">
@@ -508,7 +511,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.12';
+  window.APP_VERSION = '1.0.13';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -516,6 +519,6 @@
     document.getElementById('tb-close').addEventListener('click', () => window.electronAPI.close());
   }
 </script>
-<script src="/app.js?v=1.0.12"></script>
+<script src="/app.js?v=1.0.13"></script>
 </body>
 </html>

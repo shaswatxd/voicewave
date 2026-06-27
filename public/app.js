@@ -39,7 +39,6 @@
   let isMuted = false;
   let isForceMuted = false;
   let isDeafened = false;
-  let isHandRaised = false;
   let wasMutedBeforeDeafen = false;
   let roomTimer = null;
   let roomStartTime = null;
@@ -704,15 +703,6 @@
       }
     });
 
-    socket.on('peer-hand-raised', (data) => {
-      toast(`${peers[data.socketId]?.name || 'Someone'} raised their hand`, 'info');
-    });
-
-    socket.on('peer-hand-lowered', (data) => {
-      const name = peers[data.socketId]?.name || 'Someone';
-      toast(`${name} lowered hand`, 'info');
-    });
-
     socket.on('peer-soundboard-play', (data) => {
       const name = peers[data.socketId]?.name || 'Someone';
       toast(`${name} played ${SOUNDS[data.soundId] || data.soundId}`, 'info');
@@ -833,19 +823,6 @@
     if (window.electronAPI) window.electronAPI.updateDeafenState(isDeafened);
   }
 
-  function toggleHand() {
-    if (!socket || !roomId) return;
-    isHandRaised = !isHandRaised;
-    socket.emit(isHandRaised ? 'raise-hand' : 'lower-hand', { roomId });
-
-    const btn = $('#btn-hand');
-    if (btn) {
-      btn.classList.toggle('hand-raised', isHandRaised);
-      btn.querySelector('.control-icon').textContent = isHandRaised ? '✋' : '🤚';
-    }
-    toast(isHandRaised ? 'Hand raised ✋' : 'Hand lowered', 'info');
-  }
-
   function startAfkTimer() {
     const resetAfk = () => {
       if (isAfk) {
@@ -948,7 +925,6 @@
     isMuted = false;
     isForceMuted = false;
     isDeafened = false;
-    isHandRaised = false;
     wasMutedBeforeDeafen = false;
     isRecording = false;
     chatOpen = false;
@@ -959,8 +935,6 @@
     if (muteBtn) { muteBtn.classList.remove('muted-state'); muteBtn.querySelector('.control-label').textContent = 'Mic'; }
     const deafenBtn = $('#btn-deafen');
     if (deafenBtn) { deafenBtn.classList.remove('muted-state'); deafenBtn.querySelector('.control-label').textContent = 'Deafen'; }
-    const handBtn = $('#btn-hand');
-    if (handBtn) { handBtn.classList.remove('hand-raised'); }
     const chatPanel = $('#chat-panel');
     if (chatPanel) chatPanel.classList.remove('open');
 
@@ -988,9 +962,9 @@
     if (pendingFile) {
       const isVideo = pendingFile.type?.startsWith('video/');
       const isElectron = !!(window.electronAPI && window.electronAPI.isElectron);
-      const maxSize = (isVideo && isElectron) ? 50 * 1024 * 1024 : 2 * 1024 * 1024;
+      const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
       if (pendingFile.size > maxSize) {
-        toast(isVideo ? 'Video too large (max 50MB)' : 'File too large (max 2MB for chat)', 'error');
+        toast(isVideo ? 'Video too large (max 100MB)' : 'File too large (max 10MB)', 'error');
         pendingFile = null;
         input.value = '';
         input.placeholder = 'Send a message...';
@@ -1020,9 +994,9 @@
       toast('Video sharing is only available in the desktop app', 'error');
       return;
     }
-    const maxSize = (isVideo && isElectron) ? 50 * 1024 * 1024 : 2 * 1024 * 1024;
+    const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      toast(isVideo ? 'Video too large (max 50MB)' : 'File too large (max 2MB for chat)', 'error');
+      toast(isVideo ? 'Video too large (max 100MB)' : 'File too large (max 10MB)', 'error');
       return;
     }
     const reader = new FileReader();
@@ -1137,7 +1111,6 @@
 
     $('#btn-mute').addEventListener('click', toggleMute);
     $('#btn-deafen').addEventListener('click', toggleDeafen);
-    $('#btn-hand').addEventListener('click', toggleHand);
 
     $('#btn-chat-toggle').addEventListener('click', toggleChat);
     $('#btn-close-chat').addEventListener('click', toggleChat);
@@ -1167,9 +1140,9 @@
           e.target.value = '';
           return;
         }
-        const maxSize = (isVideo && isElectron) ? 50 * 1024 * 1024 : 2 * 1024 * 1024;
+        const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
         if (file.size > maxSize) {
-          toast(isVideo ? 'Video too large (max 50MB)' : 'File too large (max 2MB for chat)', 'error');
+          toast(isVideo ? 'Video too large (max 100MB)' : 'File too large (max 10MB)', 'error');
           e.target.value = '';
           return;
         }
@@ -1314,7 +1287,6 @@
         case 'm': toggleMute(); break;
         case 'd': toggleDeafen(); break;
         case 'c': toggleChat(); break;
-        case 'h': toggleHand(); break;
       }
     });
 
