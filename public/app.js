@@ -95,6 +95,10 @@
 
   async function getMediaStream() {
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast('Microphone not available (use HTTPS)', 'error');
+        return false;
+      }
       localStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -189,11 +193,13 @@
     if (localStream) {
       localStream.getTracks().forEach(track => {
         const transceiver = pc.addTransceiver(track, { streams: [localStream] });
-        if (track.kind === 'audio') {
-          transceiver.setCodecPreferences([
-            { mimeType: 'audio/opus', clockRate: 48000, channels: 1 },
-            { mimeType: 'audio/opus', clockRate: 48000, channels: 2 }
-          ]);
+        if (track.kind === 'audio' && transceiver.setCodecPreferences) {
+          try {
+            transceiver.setCodecPreferences([
+              { mimeType: 'audio/opus', clockRate: 48000, channels: 1 },
+              { mimeType: 'audio/opus', clockRate: 48000, channels: 2 }
+            ]);
+          } catch (e) {}
         }
       });
     }
@@ -1042,19 +1048,22 @@
       }
     });
 
+    let peerGainNodes = {};
+
     document.addEventListener('input', (e) => {
       if (e.target.dataset.peerVolume !== undefined) {
         const peerId = e.target.dataset.peerVolume;
         const stream = peerStreams[peerId];
         if (stream) {
-          stream.getAudioTracks().forEach(t => {
-            const ctx = new AudioContext();
+          if (!peerGainNodes[peerId]) {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
             const source = ctx.createMediaStreamSource(stream);
             const gain = ctx.createGain();
-            gain.gain.value = e.target.value / 100;
             source.connect(gain);
             gain.connect(ctx.destination);
-          });
+            peerGainNodes[peerId] = { ctx, gain };
+          }
+          peerGainNodes[peerId].gain.gain.value = e.target.value / 100;
         }
       }
     });

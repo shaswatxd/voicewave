@@ -28,7 +28,8 @@ function killProcess(name) {
   if (isWin) {
     run(`taskkill /F /IM ${name} /T 2>nul`);
   } else {
-    run(`pkill -f ${name} 2>/dev/null`);
+    const baseName = name.replace('.exe', '');
+    run(`pkill -f "${baseName}" 2>/dev/null`);
   }
 }
 
@@ -78,8 +79,90 @@ async function main() {
   run('npm install');
   ok('Dependencies installed');
 
-  // ── STEP 5: Bump version timestamps ──
-  log('Step 5: Updating cache-bust versions...');
+  // ── STEP 5: Validate all JS files ──
+  log('Step 5: Checking all JS files...');
+  const jsFiles = [
+    path.join(ROOT, 'server.js'),
+    path.join(ROOT, 'main.js'),
+    path.join(ROOT, 'preload.js'),
+    path.join(PUB, 'app.js'),
+    path.join(ROOT, 'scripts', 'push.js')
+  ];
+  let hasErrors = false;
+  for (const file of jsFiles) {
+    if (!fs.existsSync(file)) {
+      err(`Missing: ${path.relative(ROOT, file)}`);
+      hasErrors = true;
+      continue;
+    }
+    try {
+      const code = fs.readFileSync(file, 'utf8');
+      new Function(code);
+    } catch (e) {
+      err(`Syntax error in ${path.relative(ROOT, file)}: ${e.message}`);
+      hasErrors = true;
+    }
+  }
+  if (hasErrors) {
+    err('Fix JS errors before publishing!');
+    process.exit(1);
+  }
+  ok('All JS files valid');
+
+  // ── STEP 6: Check HTML files exist ──
+  log('Step 6: Checking HTML files...');
+  const htmlFiles = [
+    path.join(PUB, 'app.html'),
+    path.join(PUB, 'index.html')
+  ];
+  for (const file of htmlFiles) {
+    if (!fs.existsSync(file)) {
+      err(`Missing: ${path.relative(ROOT, file)}`);
+      process.exit(1);
+    }
+  }
+  ok('All HTML files present');
+
+  // ── STEP 7: Check CSS file ──
+  log('Step 7: Checking CSS...');
+  const cssFile = path.join(PUB, 'app.css');
+  if (!fs.existsSync(cssFile)) {
+    err('Missing: public/app.css');
+    process.exit(1);
+  }
+  ok('CSS file present');
+
+  // ── STEP 8: Check server starts ──
+  log('Step 8: Verifying server starts...');
+  let serverOk = false;
+  try {
+    execSync(`node -e "require('./server.js'); process.exit(0)"`, { timeout: 5000, cwd: ROOT, stdio: 'ignore' });
+    serverOk = true;
+  } catch (e) {
+    if (e.status === 0) serverOk = true;
+  }
+  if (!serverOk) {
+    err('Server failed to start!');
+    process.exit(1);
+  }
+  ok('Server starts OK');
+
+  // ── STEP 9: Check assets ──
+  log('Step 9: Checking assets...');
+  const assetsDir = path.join(ROOT, 'assets');
+  if (!fs.existsSync(assetsDir)) fs.mkdirSync(assetsDir, { recursive: true });
+  const requiredAssets = ['icon.ico', 'icon.png', 'tray.png'];
+  for (const asset of requiredAssets) {
+    const ap = path.join(assetsDir, asset);
+    if (!fs.existsSync(ap)) {
+      err(`Missing asset: ${asset}`);
+      process.exit(1);
+    }
+  }
+  ok('All assets present');
+
+  // ── STEP 10: Bump version timestamps ──
+  log('Step 10: Updating cache-bust versions...');
   const timestamp = Date.now();
 
   // Patch sw.js
@@ -94,10 +177,8 @@ async function main() {
 
   ok(`Version set to ${VERSION}`);
 
-  // ── STEP 6: Generate icons ──
-  log('Step 6: Generating icons...');
-  const assetsDir = path.join(ROOT, 'assets');
-  if (!fs.existsSync(assetsDir)) fs.mkdirSync(assetsDir, { recursive: true });
+  // ── STEP 11: Generate icons ──
+  log('Step 11: Generating icons...');
 
   try {
     const sharp = require('sharp');
@@ -143,8 +224,8 @@ async function main() {
     err('Icon generation skipped (sharp not available)');
   }
 
-  // ── STEP 7: Build Electron ──
-  log('Step 7: Building Electron app...');
+  // ── STEP 12: Build Electron ──
+  log('Step 12: Building Electron app...');
   if (process.platform === 'win32') {
     run('npx electron-builder --win --x64');
   } else {
@@ -152,16 +233,17 @@ async function main() {
   }
   ok('Electron build complete');
 
-  // ── STEP 8: Git push ──
-  log('Step 8: Pushing to git...');
+  // ── STEP 13: Git push ──
+  log('Step 13: Pushing to git...');
   run('git add -A');
   run(`git commit -m "v${VERSION} - publish ${timestamp}"`);
   run('git push origin master --force');
   ok('Pushed to master');
 
-  // ── STEP 9: GitHub Release ──
-  log('Step 9: Creating GitHub release...');
-  run(`gh release delete v${VERSION} -y 2>nul`);
+  // ── STEP 14: GitHub Release ──
+  log('Step 14: Creating GitHub release...');
+  const nulRedirect = process.platform === 'win32' ? '2>nul' : '2>/dev/null';
+  run(`gh release delete v${VERSION} -y ${nulRedirect}`);
   const installerPath = path.join(DIST, `VoiceWave-${VERSION}-Setup.exe`);
   if (fs.existsSync(installerPath)) {
     run(`gh release create v${VERSION} "${installerPath}" --title "v${VERSION}" --notes "VoiceWave v${VERSION} release"`);
