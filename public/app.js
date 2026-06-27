@@ -404,6 +404,7 @@
       roomId = data.roomId;
       isCreator = data.isCreator;
       switchScreen('room');
+      $('#connecting-overlay').classList.remove('show');
       $('#room-id-display').textContent = roomId;
 
       roomStartTime = Date.now();
@@ -413,19 +414,18 @@
         $('#room-timer').textContent = formatTime(elapsed);
       }, 1000);
 
+      renderUserGrid(data.peers);
+
+      data.peers.forEach(p => {
+        createPeerConnection(p.socketId, p.name);
+        createOffer(p.socketId);
+      });
+
       await getMediaStream();
       if (localStream) {
         setupAudioProcessing();
         enumerateDevices();
       }
-
-      data.peers.forEach(p => {
-        createPeerConnection(p.socketId, p.name);
-        addPeerToGrid(p.socketId, p.name, p.muted, p.isCreator);
-        createOffer(p.socketId);
-      });
-
-      renderUserGrid(data.peers);
 
       if (window.electronAPI) {
         window.electronAPI.updateRoomState(true);
@@ -435,9 +435,9 @@
       toast(`Joined room ${roomId}`, 'success');
     });
 
-    socket.on('room-not-found', () => toast('Room not found', 'error'));
-    socket.on('room-wrong-password', () => toast('Wrong password', 'error'));
-    socket.on('room-full', () => toast('Room is full (max 30)', 'error'));
+    socket.on('room-not-found', () => { $('#connecting-overlay').classList.remove('show'); toast('Room not found', 'error'); });
+    socket.on('room-wrong-password', () => { $('#connecting-overlay').classList.remove('show'); toast('Wrong password', 'error'); });
+    socket.on('room-full', () => { $('#connecting-overlay').classList.remove('show'); toast('Room is full (max 30)', 'error'); });
     socket.on('room-warning', (data) => toast(data.message, 'info'));
     socket.on('room-requires-password', () => {
       $('#password-modal').classList.add('open');
@@ -844,6 +844,7 @@
       window.userName = name;
       const code = generateRoomId();
       const password = $('#create-password').value;
+      $('#connecting-overlay').classList.add('show');
       connectSocket();
       socket.on('connect', () => {
         socket.emit('join-room', { roomId: code, userName: name, muted: false, joinOnly: false, password });
@@ -856,6 +857,7 @@
       if (!name) return toast('Enter your name', 'error');
       if (!code) return toast('Enter room code', 'error');
       window.userName = name;
+      $('#connecting-overlay').classList.add('show');
 
       if (!socket || !socket.connected) {
         connectSocket();
