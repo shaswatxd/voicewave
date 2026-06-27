@@ -54,6 +54,8 @@
   let speakingTimeout = null;
   let pollInterval = null;
   let pendingFile = null;
+  let botAudio = null;
+  let botAudioVolume = 80;
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -722,6 +724,39 @@
       toast('You were kicked from the room', 'error');
       leaveRoom();
     });
+
+    socket.on('bot-audio-data', (data) => {
+      if (botAudio) { botAudio.pause(); botAudio.src = ''; }
+      botAudio = new Audio();
+      botAudio.src = data.audioData;
+      botAudio.volume = botAudioVolume / 100;
+      botAudio.oncanplaythrough = () => {
+        botAudio.play().catch(e => console.warn('Bot audio play error:', e));
+        updateNowPlayingUI(data.track);
+      };
+      botAudio.onended = () => {
+        socket.emit('bot-track-ended', { roomId });
+        clearNowPlayingUI();
+      };
+      botAudio.onerror = () => {
+        toast('Music playback error', 'error');
+        clearNowPlayingUI();
+      };
+    });
+
+    socket.on('bot-track-end', () => {
+      if (botAudio) { botAudio.pause(); botAudio.src = ''; botAudio = null; }
+      clearNowPlayingUI();
+    });
+
+    socket.on('bot-now-playing', (data) => {
+      updateNowPlayingUI(data.track);
+    });
+
+    socket.on('bot-volume', (data) => {
+      botAudioVolume = data.volume;
+      if (botAudio) botAudio.volume = data.volume / 100;
+    });
   }
 
   function addChatMessage(data) {
@@ -737,6 +772,8 @@
     if (data.file) {
       if (data.file.type?.startsWith('image/')) {
         fileHtml = `<div style="margin-top:8px;"><img src="${data.file.data}" style="max-width:100%;border-radius:10px;border:1px solid rgba(255,255,255,0.06);" /></div>`;
+      } else if (data.file.type?.startsWith('video/')) {
+        fileHtml = `<div style="margin-top:8px;"><video src="${data.file.data}" controls preload="metadata" style="max-width:100%;max-height:300px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);"></video></div>`;
       } else {
         fileHtml = `<div class="chat-msg-file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><a href="${data.file.data}" download="${escapeHtml(data.file.name)}">${escapeHtml(data.file.name)}</a></div>`;
       }
@@ -770,6 +807,22 @@
     } else {
       badge.style.display = 'none';
     }
+  }
+
+  function updateNowPlayingUI(track) {
+    const bar = $('#now-playing-bar');
+    const title = $('#np-title');
+    const sub = $('#np-sub');
+    if (bar && title && sub) {
+      title.textContent = track.title;
+      sub.textContent = track.duration && track.duration !== '?' ? track.duration : '';
+      bar.style.display = 'flex';
+    }
+  }
+
+  function clearNowPlayingUI() {
+    const bar = $('#now-playing-bar');
+    if (bar) bar.style.display = 'none';
   }
 
   function toggleChat() {
@@ -934,6 +987,8 @@
     if (typingTimeout) clearTimeout(typingTimeout);
     if (speakingTimeout) clearTimeout(speakingTimeout);
     if (mediaRecorder && isRecording) mediaRecorder.stop();
+    if (botAudio) { botAudio.pause(); botAudio.src = ''; botAudio = null; }
+    clearNowPlayingUI();
 
     Object.values(peers).forEach(p => p.pc.close());
     peers = {};
@@ -984,8 +1039,11 @@
     };
 
     if (pendingFile) {
-      if (pendingFile.size > 2 * 1024 * 1024) {
-        toast('File too large (max 2MB for chat)', 'error');
+      const isVideo = pendingFile.type?.startsWith('video/');
+      const isElectron = !!(window.electronAPI && window.electronAPI.isElectron);
+      const maxSize = (isVideo && isElectron) ? 50 * 1024 * 1024 : 2 * 1024 * 1024;
+      if (pendingFile.size > maxSize) {
+        toast(isVideo ? 'Video too large (max 50MB)' : 'File too large (max 2MB for chat)', 'error');
         pendingFile = null;
         input.value = '';
         input.placeholder = 'Send a message...';
@@ -1009,8 +1067,15 @@
   }
 
   function sendFile(file) {
-    if (file.size > 2 * 1024 * 1024) {
-      toast('File too large (max 2MB for chat)', 'error');
+    const isVideo = file.type?.startsWith('video/');
+    const isElectron = !!(window.electronAPI && window.electronAPI.isElectron);
+    if (isVideo && !isElectron) {
+      toast('Video sharing is only available in the desktop app', 'error');
+      return;
+    }
+    const maxSize = (isVideo && isElectron) ? 50 * 1024 * 1024 : 2 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast(isVideo ? 'Video too large (max 50MB)' : 'File too large (max 2MB for chat)', 'error');
       return;
     }
     const reader = new FileReader();
@@ -1143,8 +1208,16 @@
     $('#chat-file-input').addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
-        if (file.size > 2 * 1024 * 1024) {
-          toast('File too large (max 2MB for chat)', 'error');
+        const isVideo = file.type?.startsWith('video/');
+        const isElectron = !!(window.electronAPI && window.electronAPI.isElectron);
+        if (isVideo && !isElectron) {
+          toast('Video sharing is only available in the desktop app', 'error');
+          e.target.value = '';
+          return;
+        }
+        const maxSize = (isVideo && isElectron) ? 50 * 1024 * 1024 : 2 * 1024 * 1024;
+        if (file.size > maxSize) {
+          toast(isVideo ? 'Video too large (max 50MB)' : 'File too large (max 2MB for chat)', 'error');
           e.target.value = '';
           return;
         }
