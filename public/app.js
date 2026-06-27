@@ -1118,21 +1118,37 @@
   if (window.electronAPI && window.electronAPI.isElectron) {
     const updateSection = $('#update-section');
     const updateLabel = $('#update-label');
+    const btnCheck = $('#btn-check-update');
     const btnDownload = $('#btn-download-update');
     const btnInstall = $('#btn-install-update');
     const progressBar = $('#update-progress-bar');
     const progressFill = $('#update-progress-fill');
     const progressText = $('#update-progress-text');
 
+    updateSection.style.display = 'block';
+
+    btnCheck.addEventListener('click', () => {
+      btnCheck.style.display = 'none';
+      btnDownload.style.display = 'none';
+      btnInstall.style.display = 'none';
+      window.electronAPI.checkForUpdates();
+    });
+
     window.electronAPI.onUpdateStatus((data) => {
-      updateSection.style.display = 'block';
       switch (data.status) {
         case 'checking':
           updateLabel.textContent = 'Checking for updates...';
+          updateLabel.style.color = '#d1d5db';
+          btnCheck.style.display = 'none';
+          btnDownload.style.display = 'none';
+          btnInstall.style.display = 'none';
+          progressBar.style.display = 'none';
+          progressText.style.display = 'none';
           break;
         case 'available':
           updateLabel.textContent = `Update v${data.version} available`;
           updateLabel.style.color = '#22d3ee';
+          btnCheck.style.display = 'none';
           btnDownload.style.display = 'inline-flex';
           btnInstall.style.display = 'none';
           progressBar.style.display = 'none';
@@ -1160,18 +1176,26 @@
         case 'up-to-date':
           updateLabel.textContent = `App is up to date (v${window.APP_VERSION || '1.0.2'})`;
           updateLabel.style.color = '#6b7280';
+          btnCheck.style.display = 'inline-flex';
+          btnDownload.style.display = 'none';
+          btnInstall.style.display = 'none';
+          progressBar.style.display = 'none';
+          progressText.style.display = 'none';
           break;
         case 'error':
           updateLabel.textContent = 'Update check failed';
           updateLabel.style.color = '#ef4444';
+          btnCheck.style.display = 'inline-flex';
+          btnDownload.style.display = 'none';
+          btnInstall.style.display = 'none';
+          progressBar.style.display = 'none';
+          progressText.style.display = 'none';
           break;
       }
     });
 
     btnDownload.addEventListener('click', () => window.electronAPI.downloadUpdate());
     btnInstall.addEventListener('click', () => window.electronAPI.installUpdate());
-
-    window.electronAPI.checkForUpdates();
   }
 
   document.addEventListener('DOMContentLoaded', initEventListeners);
