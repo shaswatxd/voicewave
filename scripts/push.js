@@ -8,11 +8,13 @@ const PUB = path.join(ROOT, 'public');
 const SW = path.join(PUB, 'sw.js');
 const APP_HTML = path.join(PUB, 'app.html');
 const INDEX_HTML = path.join(PUB, 'index.html');
-const VERSION = require(path.join(ROOT, 'package.json')).version;
+const PKG_PATH = path.join(ROOT, 'package.json');
 
 const log = (msg) => console.log(`\x1b[36m>\x1b[0m ${msg}`);
 const ok = (msg) => console.log(`\x1b[32m✓\x1b[0m ${msg}`);
 const err = (msg) => console.log(`\x1b[31m✗\x1b[0m ${msg}`);
+const info = (msg) => console.log(`\x1b[33m→\x1b[0m ${msg}`);
+
 
 function run(cmd, opts = {}) {
   try {
@@ -55,6 +57,18 @@ async function main() {
   console.log('\n\x1b[1m\x1b[35m╔══════════════════════════════════╗');
   console.log('║      VoiceWave Publish Script    ║');
   console.log('╚══════════════════════════════════╝\x1b[0m\n');
+
+  // ── STEP 0: Auto-bump patch version ──
+  log('Step 0: Bumping patch version...');
+  const pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
+  const [major, minor, patch] = pkg.version.split('.').map(Number);
+  const oldVersion = pkg.version;
+  const newVersion = `${major}.${minor}.${patch + 1}`;
+  pkg.version = newVersion;
+  fs.writeFileSync(PKG_PATH, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+  const VERSION = newVersion;
+  info(`${oldVersion}  →  ${newVersion}`);
+  ok(`Version bumped to ${VERSION}`);
 
   // ── STEP 1: Kill processes ──
   log('Step 1: Killing running processes...');
