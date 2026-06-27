@@ -244,7 +244,7 @@ async function main() {
   // ── STEP 13: Build Electron ──
   log('Step 13: Building Electron app...');
   if (process.platform === 'win32') {
-    run('npx electron-builder --win --x64 --publish always');
+    run('npx electron-builder --win --x64 --publish never');
   } else {
     run('npx electron-builder --linux --x64');
   }
@@ -262,9 +262,15 @@ async function main() {
   const nulRedirect = process.platform === 'win32' ? '2>nul' : '2>/dev/null';
   run(`gh release delete v${VERSION} -y ${nulRedirect}`);
   const installerPath = path.join(DIST, `VoiceWave-${VERSION}-Setup.exe`);
+  const blockmapPath = path.join(DIST, `VoiceWave-${VERSION}-Setup.exe.blockmap`);
+  const ymlFiles = fs.readdirSync(DIST).filter(f => f.endsWith('.yml'));
   if (fs.existsSync(installerPath)) {
-    run(`gh release create v${VERSION} "${installerPath}" --title "v${VERSION}" --notes "VoiceWave v${VERSION} release"`);
-    ok('GitHub release created');
+    const uploadFiles = [installerPath];
+    if (fs.existsSync(blockmapPath)) uploadFiles.push(blockmapPath);
+    ymlFiles.forEach(f => uploadFiles.push(path.join(DIST, f)));
+    const fileArgs = uploadFiles.map(f => `"${f}"`).join(' ');
+    run(`gh release create v${VERSION} ${fileArgs} --title "v${VERSION}" --notes "VoiceWave v${VERSION} release"`);
+    ok('GitHub release created with installer + update files');
   } else {
     err('Installer not found, skipping GitHub release');
   }
