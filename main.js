@@ -246,7 +246,10 @@ ipcMain.on('check-for-updates', () => {
 });
 
 ipcMain.on('install-update', () => {
-  autoUpdater.quitAndInstall();
+  setImmediate(() => {
+    autoUpdater.quitAndInstall(false, false);
+    setTimeout(() => { app.exit(0); }, 2000);
+  });
 });
 
 ipcMain.on('download-update', () => {

@@ -1363,7 +1363,7 @@
           btnDownload.style.display = 'none';
           progressBar.style.display = 'none';
           progressText.style.display = 'none';
-          toast('Update downloaded — restart to install', 'success');
+          toast('Update downloaded — click Close & Install', 'success');
           break;
         case 'up-to-date':
           updateLabel.textContent = `App is up to date (v${window.APP_VERSION || '1.0.2'})`;
