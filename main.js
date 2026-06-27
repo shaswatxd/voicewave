@@ -1,6 +1,8 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
+
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 let mainWindow;
 let tray;
@@ -249,6 +251,19 @@ ipcMain.on('download-update', () => {
 });
 
 app.whenReady().then(() => {
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowed = ['media', 'microphone', 'camera', 'notifications', 'mediaKeySystem'];
+    if (allowed.includes(permission)) {
+      callback(true);
+    } else {
+      callback(false);
+    }
+  });
+
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin) => {
+    return true;
+  });
+
   createWindow();
   createTray();
   setupAutoUpdater();
