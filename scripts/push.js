@@ -206,6 +206,7 @@ async function main() {
 
   // Patch index.html
   patchVersion(INDEX_HTML, /v[\d.]+/g, `v${VERSION}`);
+  patchVersion(INDEX_HTML, /VoiceWave-[\d.]+-Setup\.exe/g, `VoiceWave-${VERSION}-Setup.exe`);
 
   ok(`Version set to ${VERSION}`);
 
