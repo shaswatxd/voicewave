@@ -465,16 +465,16 @@
 
       renderUserGrid(data.peers);
 
-      data.peers.forEach(p => {
-        createPeerConnection(p.socketId, p.name);
-        createOffer(p.socketId);
-      });
-
       await getMediaStream();
       if (localStream) {
         setupAudioProcessing();
         enumerateDevices();
       }
+
+      data.peers.forEach(p => {
+        createPeerConnection(p.socketId, p.name);
+        createOffer(p.socketId);
+      });
 
       if (window.electronAPI) {
         window.electronAPI.updateRoomState(true);
