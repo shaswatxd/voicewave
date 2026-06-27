@@ -59,7 +59,6 @@ async function main() {
   log('Step 1: Killing running processes...');
   killProcess('VoiceWave.exe');
   killProcess('electron.exe');
-  killProcess('node.exe');
   await sleep(1500);
   ok('Processes terminated');
 
