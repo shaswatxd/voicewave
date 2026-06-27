@@ -116,7 +116,6 @@ async function main() {
     path.join(ROOT, 'server.js'),
     path.join(ROOT, 'main.js'),
     path.join(ROOT, 'preload.js'),
-    path.join(ROOT, 'bot.js'),
     path.join(PUB, 'app.js'),
     path.join(ROOT, 'scripts', 'push.js')
   ];

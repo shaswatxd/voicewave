@@ -54,8 +54,6 @@
   let speakingTimeout = null;
   let pollInterval = null;
   let pendingFile = null;
-  let botAudio = null;
-  let botAudioVolume = 80;
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -724,39 +722,6 @@
       toast('You were kicked from the room', 'error');
       leaveRoom();
     });
-
-    socket.on('bot-audio-data', (data) => {
-      if (botAudio) { botAudio.pause(); botAudio.src = ''; }
-      botAudio = new Audio();
-      botAudio.src = data.audioData;
-      botAudio.volume = botAudioVolume / 100;
-      botAudio.oncanplaythrough = () => {
-        botAudio.play().catch(e => console.warn('Bot audio play error:', e));
-        updateNowPlayingUI(data.track);
-      };
-      botAudio.onended = () => {
-        socket.emit('bot-track-ended', { roomId });
-        clearNowPlayingUI();
-      };
-      botAudio.onerror = () => {
-        toast('Music playback error', 'error');
-        clearNowPlayingUI();
-      };
-    });
-
-    socket.on('bot-track-end', () => {
-      if (botAudio) { botAudio.pause(); botAudio.src = ''; botAudio = null; }
-      clearNowPlayingUI();
-    });
-
-    socket.on('bot-now-playing', (data) => {
-      updateNowPlayingUI(data.track);
-    });
-
-    socket.on('bot-volume', (data) => {
-      botAudioVolume = data.volume;
-      if (botAudio) botAudio.volume = data.volume / 100;
-    });
   }
 
   function addChatMessage(data) {
@@ -807,22 +772,6 @@
     } else {
       badge.style.display = 'none';
     }
-  }
-
-  function updateNowPlayingUI(track) {
-    const bar = $('#now-playing-bar');
-    const title = $('#np-title');
-    const sub = $('#np-sub');
-    if (bar && title && sub) {
-      title.textContent = track.title;
-      sub.textContent = track.duration && track.duration !== '?' ? track.duration : '';
-      bar.style.display = 'flex';
-    }
-  }
-
-  function clearNowPlayingUI() {
-    const bar = $('#now-playing-bar');
-    if (bar) bar.style.display = 'none';
   }
 
   function toggleChat() {
@@ -987,8 +936,6 @@
     if (typingTimeout) clearTimeout(typingTimeout);
     if (speakingTimeout) clearTimeout(speakingTimeout);
     if (mediaRecorder && isRecording) mediaRecorder.stop();
-    if (botAudio) { botAudio.pause(); botAudio.src = ''; botAudio = null; }
-    clearNowPlayingUI();
 
     Object.values(peers).forEach(p => p.pc.close());
     peers = {};

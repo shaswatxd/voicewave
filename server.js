@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const MusicBot = require('./bot');
 
 const app = express();
 const server = http.createServer(app);
@@ -19,7 +18,6 @@ const MAX_USERS = 30;
 const WARN_USERS = 15;
 
 const rooms = new Map();
-const bot = new MusicBot(io);
 
 app.use(express.static(path.join(__dirname, 'public'), { noCache: true }));
 
@@ -104,19 +102,6 @@ io.on('connection', (socket) => {
       hasPassword: !!room.password
     });
 
-    const botState = bot.getState(roomId);
-    if (botState.isPlaying && botState.currentAudioData) {
-      socket.emit('bot-audio-data', {
-        roomId,
-        audioData: botState.currentAudioData,
-        track: { title: botState.nowPlaying.title, duration: botState.nowPlaying.duration }
-      });
-      socket.emit('bot-now-playing', {
-        roomId,
-        track: { title: botState.nowPlaying.title, duration: botState.nowPlaying.duration, requestedBy: botState.nowPlaying.requestedBy }
-      });
-    }
-
     socket.to(roomId).emit('peer-joined', {
       socketId: socket.id,
       name: userName,
@@ -162,16 +147,6 @@ io.on('connection', (socket) => {
       ...data,
       socketId: socket.id
     });
-
-    if (data.text && data.text.startsWith('!')) {
-      bot.handleCommand(socket, data.roomId, data.text, data.name).catch(err => {
-        console.error('[Bot] Command error:', err);
-      });
-    }
-  });
-
-  socket.on('bot-track-ended', ({ roomId }) => {
-    if (roomId) bot.onTrackEnded(roomId);
   });
 
   socket.on('delete-chat-message', ({ roomId, msgId }) => {
@@ -261,7 +236,6 @@ io.on('connection', (socket) => {
 
     if (room.users.size === 0) {
       rooms.delete(roomId);
-      bot.cleanupRoom(roomId);
       console.log(`[Room Deleted] ${roomId}`);
     } else if (sock.id === room.creator) {
       const newCreator = room.users.keys().next().value;

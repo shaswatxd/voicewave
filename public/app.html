@@ -12,7 +12,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.9">
+<link rel="stylesheet" href="/app.css?v=1.0.10">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; }
@@ -63,7 +63,6 @@
 
   /* Room body - takes all remaining space, centers user grid */
   .room-body { flex: 1; display: flex; min-height: 0; position: relative; }
-  .room-main { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 
   /* User grid - center everything */
   .user-grid { flex: 1; display: flex; flex-wrap: wrap; gap: 20px; padding: 32px 24px; align-items: center; justify-content: center; align-content: center; overflow-y: auto; }
@@ -200,13 +199,6 @@
   /* Recording */
   .recording-indicator { position: fixed; top: 50px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25); border-radius: 20px; font-size: 0.78rem; font-weight: 600; color: #ef4444; z-index: 50; }
 
-  /* Now Playing bar */
-  .now-playing-bar { display: none; align-items: center; padding: 10px 16px; background: linear-gradient(135deg, rgba(34,211,238,0.08), rgba(168,85,247,0.08)); border: 1px solid rgba(34,211,238,0.15); border-radius: 10px; margin: 8px 16px 0; flex-shrink: 0; }
-  .now-playing-bar .np-icon { font-size: 1.2rem; margin-right: 10px; animation: npPulse 2s ease-in-out infinite; }
-  @keyframes npPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
-  .now-playing-bar .np-title { font-size: 0.85rem; font-weight: 600; color: #22d3ee; }
-  .now-playing-bar .np-duration { font-size: 0.72rem; color: #8b9ab8; margin-left: 8px; font-family: 'JetBrains Mono', monospace; }
-
   /* Buttons */
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 22px; border-radius: 10px; font-size: 0.88rem; font-weight: 600; font-family: inherit; text-decoration: none; transition: all 0.2s; cursor: pointer; border: none; }
   .btn-primary { background: linear-gradient(135deg, #22d3ee, #a855f7); color: #000; }
@@ -340,17 +332,8 @@
   </div>
 
   <div class="room-body">
-    <div class="room-main">
-      <!-- Now Playing Bar -->
-      <div class="now-playing-bar" id="now-playing-bar">
-        <span class="np-icon">🎵</span>
-        <span class="np-title" id="np-title"></span>
-        <span class="np-duration" id="np-sub"></span>
-      </div>
-
-      <!-- User Grid -->
-      <div class="user-grid" id="user-grid"></div>
-    </div>
+    <!-- User Grid -->
+    <div class="user-grid" id="user-grid"></div>
 
     <!-- Chat Panel -->
     <div class="chat-panel" id="chat-panel">
@@ -524,7 +507,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.9';
+  window.APP_VERSION = '1.0.10';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -532,6 +515,6 @@
     document.getElementById('tb-close').addEventListener('click', () => window.electronAPI.close());
   }
 </script>
-<script src="/app.js?v=1.0.9"></script>
+<script src="/app.js?v=1.0.10"></script>
 </body>
 </html>
