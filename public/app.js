@@ -294,6 +294,7 @@
     });
 
     $('#participant-count').textContent = peersList.length + 1;
+    updateParticipantsDropdown();
     startSpeakingPoll();
   }
 
@@ -341,6 +342,7 @@
 
     const count = grid.querySelectorAll('.user-card').length;
     $('#participant-count').textContent = count;
+    updateParticipantsDropdown();
   }
 
   function removePeerFromGrid(socketId) {
@@ -355,6 +357,40 @@
 
     const count = $('#user-grid').querySelectorAll('.user-card').length;
     $('#participant-count').textContent = count;
+    updateParticipantsDropdown();
+  }
+
+  function updateParticipantsDropdown() {
+    const list = $('#pd-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    const me = { socketId: mySocketId, name: window.userName || 'You', muted: isMuted, isCreator: isCreator };
+    const all = [me, ...Object.values(peers).map(p => ({ socketId: p.socketId || p.pc?.id, name: p.name, muted: false, isCreator: false }))];
+
+    const cards = $$('#user-grid .user-card');
+    const finalList = [];
+    cards.forEach(card => {
+      finalList.push({
+        socketId: card.dataset.socket,
+        name: card.dataset.name,
+        muted: card.classList.contains('muted'),
+        isCreator: card.classList.contains('is-admin'),
+        isLocal: card.dataset.socket === mySocketId
+      });
+    });
+
+    finalList.forEach(p => {
+      const item = document.createElement('div');
+      item.className = 'pd-item';
+      const dotClass = p.muted ? 'muted' : (p.socketId === mySocketId && !isMuted ? 'idle' : 'idle');
+      item.innerHTML = `
+        <div class="pd-dot ${dotClass}"></div>
+        <div class="pd-name">${p.name}${p.isLocal ? '<span class="pd-you">(You)</span>' : ''}</div>
+        ${p.isCreator ? '<span class="pd-admin">Admin</span>' : ''}
+      `;
+      list.appendChild(item);
+    });
   }
 
   function updatePeerMuted(socketId, muted) {
@@ -883,6 +919,20 @@
     });
 
     $('#btn-invite').addEventListener('click', copyInviteLink);
+
+    $('#btn-participants').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dd = $('#participants-dropdown');
+      dd.classList.toggle('open');
+      if (dd.classList.contains('open')) updateParticipantsDropdown();
+    });
+
+    document.addEventListener('click', (e) => {
+      const dd = $('#participants-dropdown');
+      if (dd && !e.target.closest('#participants-dropdown') && !e.target.closest('#btn-participants')) {
+        dd.classList.remove('open');
+      }
+    });
 
     $('#btn-leave').addEventListener('click', leaveRoom);
 
