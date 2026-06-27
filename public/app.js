@@ -1050,6 +1050,11 @@
   }
 
   function initEventListeners() {
+    if ('ontouchstart' in window && window.innerWidth <= 768) {
+      const eb = $('#emoji-bar');
+      if (eb) eb.style.display = 'none';
+    }
+
     $$('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
         $$('.tab').forEach(t => t.classList.remove('active'));
