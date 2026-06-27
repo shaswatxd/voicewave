@@ -20,7 +20,7 @@
   .screen { display: none; width: 100%; height: 100dvh; height: 100vh; }
   .screen.active { display: flex !important; flex-direction: column !important; }
 
-  #lobby.active { justify-content: center; align-items: center; }
+  #lobby.active { justify-content: flex-start; align-items: center; padding-top: 4vh; }
 
   /* ROOM LAYOUT - Discord style */
   #room.active { background: #060a12; padding-bottom: env(safe-area-inset-bottom, 8px); }
@@ -213,33 +213,10 @@
   /* Mobile responsive */
   @media (max-width: 768px) {
     .chat-panel { width: 100%; border-left: none; border-radius: 0; }
-    .user-grid { gap: 12px; padding: 16px; }
-    .user-card { min-width: 140px; max-width: 160px; padding: 20px 14px; }
-    .user-avatar { width: 52px; height: 52px; font-size: 1.1rem; }
-    .user-name { font-size: 0.8rem; }
-    .control-btn { padding: 8px 12px; min-width: 48px; }
-    .control-icon svg { width: 20px; height: 20px; }
-    .control-label { font-size: 0.55rem; }
-    .room-header { padding: 8px 12px; }
-    .btn-icon { width: 34px; height: 34px; }
-    .room-timer { font-size: 0.78rem; }
-    .room-id-label { font-size: 0.75rem; }
+    .user-actions { opacity: 1; }
   }
-  @media (max-width: 480px) {
-    .control-bar { gap: 4px; padding: 8px 8px 16px; }
-    .controls-left, .controls-center, .controls-right { gap: 4px; }
-    .control-btn { padding: 8px 10px; min-width: 44px; border-radius: 10px; }
-    .control-label { display: none; }
-    .control-icon svg { width: 18px; height: 18px; }
-    .user-grid { gap: 10px; padding: 12px; }
-    .user-card { min-width: 120px; max-width: 140px; padding: 16px 10px; }
-    .user-avatar { width: 44px; height: 44px; font-size: 1rem; }
-    .user-name { font-size: 0.75rem; }
-    .room-header { padding: 6px 10px; gap: 4px; }
-    .room-actions { gap: 4px; }
-    .btn-icon { width: 32px; height: 32px; font-size: 0.85rem; }
-    .room-code { font-size: 0.78rem; }
-    .room-timer { font-size: 0.72rem; }
+  @media (hover: none) and (pointer: coarse) {
+    .user-actions { opacity: 1; }
   }
 </style>
 </head>

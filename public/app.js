@@ -291,7 +291,7 @@
     const grid = $('#user-grid');
     grid.innerHTML = '';
 
-    const myCard = createUserCard(mySocketId, window.userName || 'You', isMuted, true, true);
+    const myCard = createUserCard(mySocketId, window.userName || 'You', isMuted, isCreator, true);
     grid.appendChild(myCard);
 
     peersList.forEach(p => {
@@ -331,7 +331,7 @@
         <div class="meter-bar"></div>
         <div class="meter-bar"></div>
       </div>
-      ${!isLocal && isCreator ? `<div class="user-actions"><div class="user-kick" data-kick="${socketId}" title="Kick user">✕</div><div class="user-mute-btn" data-force-mute="${socketId}" title="${muted ? 'Unmute user' : 'Mute user'}">${muted ? '🔇' : '🔊'}</div></div>` : ''}
+      ${!isLocal && window._iAmCreator ? `<div class="user-actions"><div class="user-kick" data-kick="${socketId}" title="Kick user">✕</div><div class="user-mute-btn" data-force-mute="${socketId}" title="${muted ? 'Unmute user' : 'Mute user'}">${muted ? '🔇' : '🔊'}</div></div>` : ''}
       ${!isLocal ? `<div class="user-volume"><input type="range" min="0" max="100" value="80" data-peer-volume="${socketId}"></div>` : ''}
     `;
 
@@ -451,6 +451,7 @@
     socket.on('room-joined', async (data) => {
       roomId = data.roomId;
       isCreator = data.isCreator;
+      window._iAmCreator = isCreator;
       switchScreen('room');
       $('#connecting-overlay').classList.remove('show');
       $('#room-id-display').textContent = roomId;
@@ -517,7 +518,19 @@
 
     socket.on('new-creator', (data) => {
       isCreator = data.socketId === mySocketId;
+      window._iAmCreator = isCreator;
       toast(isCreator ? 'You are now the room creator' : 'New creator assigned', 'info');
+      const grid = $('#user-grid');
+      const cards = grid.querySelectorAll('.user-card');
+      cards.forEach(card => {
+        const sid = card.dataset.socket;
+        const name = card.dataset.name;
+        const muted = card.classList.contains('muted');
+        const cardIsCreator = sid === data.socketId;
+        const cardIsLocal = sid === mySocketId;
+        const newCard = createUserCard(sid, name, muted, cardIsCreator, cardIsLocal);
+        card.replaceWith(newCard);
+      });
     });
 
     socket.on('offer', async (data) => {

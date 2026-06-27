@@ -375,7 +375,7 @@ body {
   flex-shrink: 0;
   gap: 8px;
 }
-.controls-left, .controls-center, .controls-right {
+.controls-left, .controls-right {
   display: flex; gap: 6px; align-items: center;
 }
 .control-btn {
@@ -566,7 +566,7 @@ body {
 @supports (padding: env(safe-area-inset-top)) {
   .room-header { padding-top: calc(12px + env(safe-area-inset-top)); padding-left: calc(20px + env(safe-area-inset-left)); padding-right: calc(20px + env(safe-area-inset-right)); }
   .control-bar { padding-bottom: calc(12px + env(safe-area-inset-bottom)); padding-left: calc(20px + env(safe-area-inset-left)); padding-right: calc(20px + env(safe-area-inset-right)); }
-  .lobby-container { padding-top: calc(24px + env(safe-area-inset-top)); padding-bottom: calc(24px + env(safe-area-inset-bottom)); padding-left: calc(24px + env(safe-area-inset-left)); padding-right: calc(24px + env(safe-area-inset-right)); }
+  .lobby-container { padding-left: calc(24px + env(safe-area-inset-left)); padding-right: calc(24px + env(safe-area-inset-right)); }
 }
 
 @media (max-width: 768px) {
@@ -600,7 +600,7 @@ body {
   .form-group input { padding: 14px; font-size: 1rem; min-height: 48px; }
   .btn { min-height: 48px; padding: 12px 20px; }
   .control-bar { flex-wrap: wrap; gap: 6px; padding: 8px 12px; }
-  .controls-left, .controls-center, .controls-right { gap: 6px; }
+  .controls-left, .controls-right { gap: 6px; }
   .control-btn { padding: 8px 10px; border-radius: 8px; }
   .control-icon { font-size: 1rem; }
   .room-header { padding: 8px 10px; }
@@ -617,7 +617,7 @@ body {
   .setting-item input[type="range"] { height: 6px; }
   .feature-pills { gap: 6px; }
   .pill { padding: 5px 10px; font-size: 0.7rem; }
-  .toast { max-width: 260px; font-size: 0.8rem; padding: 10px 14px; top: 10px; right: 10px; }
+  .toast { max-width: 260px; font-size: 0.8rem; padding: 10px 14px; }
   .recording-indicator { top: 50px; font-size: 0.72rem; padding: 6px 12px; }
   .typing-indicator { padding: 6px 10px; font-size: 0.72rem; }
 }
@@ -629,7 +629,7 @@ body {
   .user-name { font-size: 0.72rem; }
   .control-bar { padding: 6px 8px; }
   .control-btn { padding: 6px 8px; min-width: 40px; min-height: 40px; }
-  .controls-left, .controls-center, .controls-right { gap: 4px; }
+  .controls-left, .controls-right { gap: 4px; }
   .lobby-card { padding: 16px; }
   .tab { padding: 10px 6px; font-size: 0.75rem; }
   .form-group input { padding: 12px; }
