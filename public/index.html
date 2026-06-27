@@ -6,6 +6,10 @@
 <title>VoiceWave — Crystal-Clear Voice Chat</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#060a12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VoiceWave">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -560,6 +564,14 @@
     deferredPrompt = e;
     const btn = document.getElementById('btn-pwa-install');
     if (btn) btn.style.display = 'inline-flex';
+  });
+  document.getElementById('btn-pwa-install')?.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    const btn = document.getElementById('btn-pwa-install');
+    if (btn) btn.style.display = 'none';
   });
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
