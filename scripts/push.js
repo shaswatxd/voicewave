@@ -63,24 +63,41 @@ async function main() {
   await sleep(1500);
   ok('Processes terminated');
 
-  // ── STEP 2: Clear npm cache ──
-  log('Step 2: Clearing npm cache...');
+  // ── STEP 2: Clear Electron cache ──
+  log('Step 2: Clearing Electron cache...');
+  const isWin = process.platform === 'win32';
+  if (isWin) {
+    const localAppData = process.env.LOCALAPPDATA || '';
+    const electronCache = path.join(localAppData, 'VoiceWave');
+    const electronCacheAlt = path.join(localAppData, 'voicewave');
+    const userData = path.join(localAppData, 'Programs', 'VoiceWave');
+    [electronCache, electronCacheAlt].forEach(dir => {
+      if (fs.existsSync(dir)) {
+        fs.rmSync(dir, { recursive: true, force: true });
+        ok(`Cleared: ${path.basename(dir)}`);
+      }
+    });
+  }
+  ok('Electron cache cleared');
+
+  // ── STEP 3: Clear npm cache ──
+  log('Step 3: Clearing npm cache...');
   run('npm cache clean --force');
   ok('npm cache cleared');
 
-  // ── STEP 3: Delete old dist ──
-  log('Step 3: Deleting old dist/ folder...');
+  // ── STEP 4: Delete old dist ──
+  log('Step 4: Deleting old dist/ folder...');
   deleteFolder(DIST);
   ok('dist/ clean');
 
-  // ── STEP 4: Delete node_modules and reinstall ──
-  log('Step 4: Fresh install dependencies...');
+  // ── STEP 5: Delete node_modules and reinstall ──
+  log('Step 5: Fresh install dependencies...');
   deleteFolder(path.join(ROOT, 'node_modules'));
   run('npm install');
   ok('Dependencies installed');
 
-  // ── STEP 5: Validate all JS files ──
-  log('Step 5: Checking all JS files...');
+  // ── STEP 6: Validate all JS files ──
+  log('Step 6: Checking all JS files...');
   const jsFiles = [
     path.join(ROOT, 'server.js'),
     path.join(ROOT, 'main.js'),
@@ -109,8 +126,8 @@ async function main() {
   }
   ok('All JS files valid');
 
-  // ── STEP 6: Check HTML files exist ──
-  log('Step 6: Checking HTML files...');
+  // ── STEP 7: Check HTML files exist ──
+  log('Step 7: Checking HTML files...');
   const htmlFiles = [
     path.join(PUB, 'app.html'),
     path.join(PUB, 'index.html')
@@ -123,8 +140,8 @@ async function main() {
   }
   ok('All HTML files present');
 
-  // ── STEP 7: Check CSS file ──
-  log('Step 7: Checking CSS...');
+  // ── STEP 8: Check CSS file ──
+  log('Step 8: Checking CSS...');
   const cssFile = path.join(PUB, 'app.css');
   if (!fs.existsSync(cssFile)) {
     err('Missing: public/app.css');
@@ -132,8 +149,8 @@ async function main() {
   }
   ok('CSS file present');
 
-  // ── STEP 8: Check server starts ──
-  log('Step 8: Verifying server starts...');
+  // ── STEP 9: Check server starts ──
+  log('Step 9: Verifying server starts...');
   let serverOk = false;
   try {
     execSync(`node -e "require('./server.js'); process.exit(0)"`, { timeout: 5000, cwd: ROOT, stdio: 'ignore' });
@@ -147,8 +164,8 @@ async function main() {
   }
   ok('Server starts OK');
 
-  // ── STEP 9: Check assets ──
-  log('Step 9: Checking assets...');
+  // ── STEP 10: Check assets ──
+  log('Step 10: Checking assets...');
   const assetsDir = path.join(ROOT, 'assets');
   if (!fs.existsSync(assetsDir)) fs.mkdirSync(assetsDir, { recursive: true });
   const requiredAssets = ['icon.ico', 'icon.png', 'tray.png'];
@@ -161,8 +178,8 @@ async function main() {
   }
   ok('All assets present');
 
-  // ── STEP 10: Bump version timestamps ──
-  log('Step 10: Updating cache-bust versions...');
+  // ── STEP 11: Bump version timestamps ──
+  log('Step 11: Updating cache-bust versions...');
   const timestamp = Date.now();
 
   // Patch sw.js
@@ -177,8 +194,8 @@ async function main() {
 
   ok(`Version set to ${VERSION}`);
 
-  // ── STEP 11: Generate icons ──
-  log('Step 11: Generating icons...');
+  // ── STEP 12: Generate icons ──
+  log('Step 12: Generating icons...');
 
   try {
     const sharp = require('sharp');
@@ -224,8 +241,8 @@ async function main() {
     err('Icon generation skipped (sharp not available)');
   }
 
-  // ── STEP 12: Build Electron ──
-  log('Step 12: Building Electron app...');
+  // ── STEP 13: Build Electron ──
+  log('Step 13: Building Electron app...');
   if (process.platform === 'win32') {
     run('npx electron-builder --win --x64');
   } else {
@@ -233,15 +250,15 @@ async function main() {
   }
   ok('Electron build complete');
 
-  // ── STEP 13: Git push ──
-  log('Step 13: Pushing to git...');
+  // ── STEP 14: Git push ──
+  log('Step 14: Pushing to git...');
   run('git add -A');
   run(`git commit -m "v${VERSION} - publish ${timestamp}"`);
   run('git push origin master --force');
   ok('Pushed to master');
 
-  // ── STEP 14: GitHub Release ──
-  log('Step 14: Creating GitHub release...');
+  // ── STEP 15: GitHub Release ──
+  log('Step 15: Creating GitHub release...');
   const nulRedirect = process.platform === 'win32' ? '2>nul' : '2>/dev/null';
   run(`gh release delete v${VERSION} -y ${nulRedirect}`);
   const installerPath = path.join(DIST, `VoiceWave-${VERSION}-Setup.exe`);
