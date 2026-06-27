@@ -693,6 +693,7 @@
     mediaRecorder.start();
     isRecording = true;
     $('#btn-record').classList.add('active');
+    $('#record-label').textContent = 'Stop';
     toast('Recording started', 'info');
   }
 
@@ -701,6 +702,7 @@
       mediaRecorder.stop();
       isRecording = false;
       $('#btn-record').classList.remove('active');
+      $('#record-label').textContent = 'Record';
       toast('Recording saved', 'success');
     }
   }
@@ -840,7 +842,6 @@
 
     $('#btn-mute').addEventListener('click', toggleMute);
     $('#btn-deafen').addEventListener('click', toggleDeafen);
-    $('#btn-hand').addEventListener('click', toggleHand);
 
     $('#btn-chat-toggle').addEventListener('click', toggleChat);
     $('#btn-close-chat').addEventListener('click', toggleChat);
@@ -944,7 +945,6 @@
       switch (e.key.toLowerCase()) {
         case 'm': toggleMute(); break;
         case 'd': toggleDeafen(); break;
-        case 'h': toggleHand(); break;
         case 'c': toggleChat(); break;
       }
     });
