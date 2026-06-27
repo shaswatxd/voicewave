@@ -13,7 +13,8 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 3000;
-const MAX_USERS = 20;
+const MAX_USERS = 30;
+const WARN_USERS = 15;
 
 const rooms = new Map();
 
@@ -78,6 +79,12 @@ io.on('connection', (socket) => {
 
     socket.join(roomId);
     socket.roomId = roomId;
+
+    const userCount = room.users.size + 1;
+
+    if (userCount >= WARN_USERS && userCount < MAX_USERS) {
+      io.to(roomId).emit('room-warning', { count: userCount, max: MAX_USERS, message: `Room has ${userCount} members. Quality may degrade after ${MAX_USERS}.` });
+    }
 
     const peers = [];
     room.users.forEach((user, id) => {

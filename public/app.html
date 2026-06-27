@@ -110,7 +110,8 @@
   .chat-msg.own .chat-msg-name { color: #a855f7; }
   .chat-msg-time { font-size: 0.62rem; color: #6b7280; font-weight: 500; }
   .chat-msg-text { font-size: 0.85rem; color: #d1d5db; line-height: 1.5; word-break: break-word; }
-  .chat-msg-delete { font-size: 0.62rem; color: #ef4444; cursor: pointer; opacity: 0; transition: opacity 0.2s; margin-top: 4px; font-weight: 600; }
+  .chat-msg-delete { font-size: 0.62rem; color: #ef4444; cursor: pointer; opacity: 0; transition: all 0.2s; margin-top: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.15); border-radius: 6px; width: fit-content; }
+  .chat-msg-delete:hover { opacity: 1; background: rgba(239,68,68,0.2); border-color: rgba(239,68,68,0.4); }
   .chat-msg:hover .chat-msg-delete { opacity: 1; }
   .chat-msg-file { margin-top: 6px; padding: 8px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; }
   .chat-msg-file a { color: #22d3ee; font-size: 0.78rem; font-weight: 600; text-decoration: none; }
@@ -407,8 +408,8 @@
     <div class="settings-grid">
       <div class="setting-item">
         <label>Master Volume</label>
-        <input type="range" id="master-volume" min="0" max="100" value="80">
-        <span class="setting-value" id="master-volume-val">80%</span>
+        <input type="range" id="master-volume" min="0" max="100" value="100">
+        <span class="setting-value" id="master-volume-val">100%</span>
       </div>
       <div class="setting-item">
         <label>Mic Gain</label>

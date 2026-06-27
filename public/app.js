@@ -2,6 +2,7 @@
   const ICE_SERVERS = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
     { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
     { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
@@ -51,6 +52,7 @@
   let isRecording = false;
   let speakingTimeout = null;
   let pollInterval = null;
+  let pendingFile = null;
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -97,7 +99,10 @@
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
+          autoGainControl: true,
+          sampleRate: 48000,
+          channelCount: 1,
+          sampleSize: 16
         }
       });
       return true;
@@ -132,20 +137,21 @@
   }
 
   function setupAudioProcessing() {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
     const source = audioContext.createMediaStreamSource(localStream);
 
     micGainNode = audioContext.createGain();
     micGainNode.gain.value = 1;
 
     analyserNode = audioContext.createAnalyser();
-    analyserNode.fftSize = 256;
+    analyserNode.fftSize = 512;
+    analyserNode.smoothingTimeConstant = 0.8;
 
     source.connect(micGainNode);
     micGainNode.connect(analyserNode);
 
     masterGainNode = audioContext.createGain();
-    masterGainNode.gain.value = 0.8;
+    masterGainNode.gain.value = 1;
   }
 
   function pollSpeaking() {
@@ -172,11 +178,24 @@
   }
 
   function createPeerConnection(socketId, name) {
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const pc = new RTCPeerConnection({
+      iceServers: ICE_SERVERS,
+      iceTransportPolicy: 'all',
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require'
+    });
     peers[socketId] = { pc, name };
 
     if (localStream) {
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+      localStream.getTracks().forEach(track => {
+        const transceiver = pc.addTransceiver(track, { streams: [localStream] });
+        if (track.kind === 'audio') {
+          transceiver.setCodecPreferences([
+            { mimeType: 'audio/opus', clockRate: 48000, channels: 1 },
+            { mimeType: 'audio/opus', clockRate: 48000, channels: 2 }
+          ]);
+        }
+      });
     }
 
     pc.onicecandidate = (e) => {
@@ -418,7 +437,8 @@
 
     socket.on('room-not-found', () => toast('Room not found', 'error'));
     socket.on('room-wrong-password', () => toast('Wrong password', 'error'));
-    socket.on('room-full', () => toast('Room is full', 'error'));
+    socket.on('room-full', () => toast('Room is full (max 30)', 'error'));
+    socket.on('room-warning', (data) => toast(data.message, 'info'));
     socket.on('room-requires-password', () => {
       $('#password-modal').classList.add('open');
     });
@@ -551,7 +571,7 @@
       </div>
       <div class="chat-msg-text">${escapeHtml(data.text)}</div>
       ${fileHtml}
-      ${isOwn || isCreator ? `<div class="chat-msg-delete" data-delete="${data.msgId}">Delete</div>` : ''}
+      ${isOwn || isCreator ? `<div class="chat-msg-delete" data-delete="${data.msgId}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg> Delete</div>` : ''}
     `;
 
     container.appendChild(el);
@@ -743,17 +763,38 @@
   function sendMessage() {
     const input = $('#chat-input');
     const text = input.value.trim();
-    if (!text) return;
+    if (!text && !pendingFile) return;
 
     const msgId = `${mySocketId}-${Date.now()}`;
-    socket.emit('chat-message', {
+    const msgData = {
       roomId,
       name: window.userName || 'Anonymous',
-      text,
+      text: text || (pendingFile ? `📎 ${pendingFile.name}` : ''),
       timestamp: Date.now(),
       msgId
-    });
+    };
+
+    if (pendingFile) {
+      if (pendingFile.size > 5 * 1024 * 1024) {
+        toast('File too large (max 5MB)', 'error');
+        pendingFile = null;
+        input.value = '';
+        input.placeholder = 'Send a message...';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        msgData.file = { name: pendingFile.name, type: pendingFile.type, data: reader.result };
+        socket.emit('chat-message', msgData);
+      };
+      reader.readAsDataURL(pendingFile);
+      pendingFile = null;
+    } else {
+      socket.emit('chat-message', msgData);
+    }
+
     input.value = '';
+    input.placeholder = 'Send a message...';
     socket.emit('typing-stop', { roomId });
   }
 
@@ -865,8 +906,11 @@
     $('#chat-file-input').addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
-        sendFile(file);
-        e.target.value = '';
+        pendingFile = file;
+        const input = $('#chat-input');
+        input.value = `📎 ${file.name}`;
+        input.placeholder = 'Press Send to share file...';
+        input.focus();
       }
     });
 
