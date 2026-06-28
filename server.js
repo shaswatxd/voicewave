@@ -36,11 +36,14 @@ app.get('/health', (req, res) => {
 io.on('connection', (socket) => {
   console.log(`[Connect] ${socket.id}`);
 
-  socket.on('join-room', ({ roomId, userName, muted, joinOnly, password }) => {
+  socket.on('join-room', ({ roomId, userName, muted, joinOnly, password, avatar }) => {
     if (!roomId || !userName || roomId.length > 10 || userName.length > 32) {
       socket.emit('room-not-found', { roomId });
       return;
     }
+
+    // Validate avatar size (max 300KB base64 string)
+    const validAvatar = (avatar && typeof avatar === 'string' && avatar.startsWith('data:image') && avatar.length < 400000) ? avatar : null;
 
     let room = rooms.get(roomId);
 
@@ -90,10 +93,10 @@ io.on('connection', (socket) => {
 
     const peers = [];
     room.users.forEach((user, id) => {
-      peers.push({ socketId: id, name: user.name, muted: user.muted, isCreator: id === room.creator });
+      peers.push({ socketId: id, name: user.name, muted: user.muted, isCreator: id === room.creator, avatar: user.avatar || null });
     });
 
-    room.users.set(socket.id, { name: userName, muted: muted || false });
+    room.users.set(socket.id, { name: userName, muted: muted || false, avatar: validAvatar });
     socket.emit('room-joined', {
       roomId,
       peers,
@@ -106,7 +109,8 @@ io.on('connection', (socket) => {
       socketId: socket.id,
       name: userName,
       muted: muted || false,
-      isCreator: socket.id === room.creator
+      isCreator: socket.id === room.creator,
+      avatar: validAvatar
     });
 
     console.log(`[Join] ${userName} → ${roomId} (${room.users.size} users)`);

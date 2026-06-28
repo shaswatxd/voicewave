@@ -54,6 +54,7 @@
   let speakingTimeout = null;
   let pollInterval = null;
   let pendingFile = null;
+  let userAvatar = null; // base64 data URL or null
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -95,6 +96,86 @@
 
   function getInitial(name) {
     return name ? name.charAt(0).toUpperCase() : '?';
+  }
+
+  function loadAvatar() {
+    try {
+      const saved = localStorage.getItem('vw_avatar');
+      if (saved) {
+        userAvatar = saved;
+        updateProfileAvatar();
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function saveAvatar(dataUrl) {
+    userAvatar = dataUrl;
+    try {
+      localStorage.setItem('vw_avatar', dataUrl);
+    } catch (e) {
+      toast('Avatar too large to save', 'error');
+    }
+    updateProfileAvatar();
+  }
+
+  function removeAvatar() {
+    userAvatar = null;
+    try { localStorage.removeItem('vw_avatar'); } catch (e) { /* ignore */ }
+    updateProfileAvatar();
+  }
+
+  function updateProfileAvatar() {
+    const initial = $('#profile-avatar-initial');
+    const img = $('#profile-avatar-img');
+    const removeBtn = $('#btn-remove-avatar');
+    const nameEl = $('#profile-name');
+
+    if (userAvatar) {
+      img.src = userAvatar;
+      img.style.display = 'block';
+      initial.style.display = 'none';
+      removeBtn.style.display = 'inline-flex';
+    } else {
+      img.style.display = 'none';
+      initial.style.display = 'block';
+      removeBtn.style.display = 'none';
+    }
+
+    if (window.userName) {
+      initial.textContent = getInitial(window.userName);
+      nameEl.textContent = window.userName;
+    }
+  }
+
+  function handleAvatarUpload(file) {
+    if (!file || !file.type.startsWith('image/')) {
+      toast('Please select an image file', 'error');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast('Image must be under 2MB', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      // Resize to max 200x200 to keep socket messages small
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const size = Math.min(img.width, img.height, 200);
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const sx = (img.width - size) / 2;
+        const sy = (img.height - size) / 2;
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, size, size);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        saveAvatar(dataUrl);
+        toast('Avatar updated!', 'success');
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
   }
 
   async function getMediaStream(deviceId) {
@@ -353,12 +434,14 @@
     const grid = $('#user-grid');
     grid.innerHTML = '';
 
-    const myCard = createUserCard(mySocketId, window.userName || 'You', isMuted, isCreator, true);
+    const myCard = createUserCard(mySocketId, window.userName || 'You', isMuted, isCreator, true, userAvatar);
     grid.appendChild(myCard);
 
     peersList.forEach(p => {
-      const card = createUserCard(p.socketId, p.name, p.muted, p.isCreator, false);
+      const card = createUserCard(p.socketId, p.name, p.muted, p.isCreator, false, p.avatar || null);
       grid.appendChild(card);
+      // Store avatar in peers object for chat messages
+      if (peers[p.socketId]) peers[p.socketId].avatar = p.avatar || null;
     });
 
     $('#participant-count').textContent = peersList.length + 1;
@@ -366,7 +449,7 @@
     startSpeakingPoll();
   }
 
-  function createUserCard(socketId, name, muted, isCreator, isLocal) {
+  function createUserCard(socketId, name, muted, isCreator, isLocal, avatar) {
     const card = document.createElement('div');
     card.className = `user-card ${muted ? 'muted' : ''} ${isCreator ? 'is-admin' : ''}`;
     card.dataset.socket = socketId;
@@ -374,9 +457,12 @@
 
     const avatarColor = getAvatarColor(name);
     const initial = getInitial(name);
+    const avatarHtml = avatar
+      ? `<div class="user-avatar" style="background:${avatarColor};"><img src="${escapeHtml(avatar)}" alt=""></div>`
+      : `<div class="user-avatar" style="background:${avatarColor};">${escapeHtml(initial)}</div>`;
 
     card.innerHTML = `
-      <div class="user-avatar" style="background:${avatarColor};">${escapeHtml(initial)}</div>
+      ${avatarHtml}
       <div class="user-name">${escapeHtml(name)}${isLocal ? ' (You)' : ''}</div>
       <div class="user-status">
         <div class="status-dot ${muted ? 'muted' : 'idle'}"></div>
@@ -400,12 +486,12 @@
     return card;
   }
 
-  function addPeerToGrid(socketId, name, muted, isCreator) {
+  function addPeerToGrid(socketId, name, muted, isCreator, avatar) {
     const grid = $('#user-grid');
     const existing = grid.querySelector(`[data-socket="${socketId}"]`);
     if (existing) existing.remove();
 
-    const card = createUserCard(socketId, name, muted, isCreator, false);
+    const card = createUserCard(socketId, name, muted, isCreator, false, avatar || null);
     grid.appendChild(card);
 
     const count = grid.querySelectorAll('.user-card').length;
@@ -433,18 +519,20 @@
     if (!list) return;
     list.innerHTML = '';
 
-    const me = { socketId: mySocketId, name: window.userName || 'You', muted: isMuted, isCreator: isCreator };
-    const all = [me, ...Object.values(peers).map(p => ({ socketId: p.socketId || p.pc?.id, name: p.name, muted: false, isCreator: false }))];
+    const me = { socketId: mySocketId, name: window.userName || 'You', muted: isMuted, isCreator: isCreator, avatar: userAvatar };
+    const all = [me, ...Object.values(peers).map(p => ({ socketId: p.socketId || p.pc?.id, name: p.name, muted: false, isCreator: false, avatar: p.avatar || null }))];
 
     const cards = $$('#user-grid .user-card');
     const finalList = [];
     cards.forEach(card => {
+      const imgEl = card.querySelector('.user-avatar img');
       finalList.push({
         socketId: card.dataset.socket,
         name: card.dataset.name,
         muted: card.classList.contains('muted'),
         isCreator: card.classList.contains('is-admin'),
-        isLocal: card.dataset.socket === mySocketId
+        isLocal: card.dataset.socket === mySocketId,
+        avatar: imgEl ? imgEl.src : null
       });
     });
 
@@ -452,8 +540,11 @@
       const item = document.createElement('div');
       item.className = 'pd-item';
       const dotClass = p.muted ? 'muted' : 'idle';
+      const avatarHtml = p.avatar
+        ? `<img src="${escapeHtml(p.avatar)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
+        : `<div class="pd-dot ${dotClass}"></div>`;
       item.innerHTML = `
-        <div class="pd-dot ${dotClass}"></div>
+        ${avatarHtml}
         <div class="pd-name">${escapeHtml(p.name)}${p.isLocal ? '<span class="pd-you">(You)</span>' : ''}</div>
         ${p.isCreator ? '<span class="pd-admin">Admin</span>' : ''}
       `;
@@ -581,7 +672,8 @@
 
     socket.on('peer-joined', async (data) => {
       createPeerConnection(data.socketId, data.name);
-      addPeerToGrid(data.socketId, data.name, data.muted, data.isCreator);
+      if (peers[data.socketId]) peers[data.socketId].avatar = data.avatar || null;
+      addPeerToGrid(data.socketId, data.name, data.muted, data.isCreator, data.avatar);
       toast(`${data.name} joined`, 'info');
       // If we somehow don't have the stream on peer connections, add it now
       if (localStream) {
@@ -627,7 +719,8 @@
         const muted = card.classList.contains('muted');
         const cardIsCreator = sid === data.socketId;
         const cardIsLocal = sid === mySocketId;
-        const newCard = createUserCard(sid, name, muted, cardIsCreator, cardIsLocal);
+        const avatar = card.querySelector('.user-avatar img')?.src || null;
+        const newCard = createUserCard(sid, name, muted, cardIsCreator, cardIsLocal, avatar);
         card.replaceWith(newCard);
         if (peerStreams[sid]) {
           updateUserCardAudio(sid, peerStreams[sid]);
@@ -725,6 +818,18 @@
     el.className = `chat-msg${isOwn ? ' own' : ''}`;
     el.dataset.msgid = data.msgId;
 
+    // Get sender avatar
+    let senderAvatar = null;
+    if (isOwn) {
+      senderAvatar = userAvatar;
+    } else if (peers[data.socketId]) {
+      senderAvatar = peers[data.socketId].avatar;
+    }
+
+    const avatarHtml = senderAvatar
+      ? `<img src="${escapeHtml(senderAvatar)}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-right:6px;">`
+      : '';
+
     let fileHtml = '';
     if (data.file) {
       if (data.file.type?.startsWith('image/')) {
@@ -738,7 +843,10 @@
 
     el.innerHTML = `
       <div class="chat-msg-header">
-        <span class="chat-msg-name">${escapeHtml(data.name)}</span>
+        <div style="display:flex;align-items:center;gap:4px;">
+          ${avatarHtml}
+          <span class="chat-msg-name">${escapeHtml(data.name)}</span>
+        </div>
         <span class="chat-msg-time">${time}</span>
       </div>
       <div class="chat-msg-text">${escapeHtml(data.text)}</div>
@@ -1058,6 +1166,30 @@
       if (eb) eb.style.display = 'none';
     }
 
+    // Avatar upload
+    const avatarWrapper = $('#profile-avatar-wrapper');
+    const avatarInput = $('#avatar-input');
+    const removeAvatarBtn = $('#btn-remove-avatar');
+
+    if (avatarWrapper && avatarInput) {
+      avatarWrapper.addEventListener('click', () => avatarInput.click());
+      avatarInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) handleAvatarUpload(file);
+        avatarInput.value = '';
+      });
+    }
+    if (removeAvatarBtn) {
+      removeAvatarBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeAvatar();
+        toast('Avatar removed', 'info');
+      });
+    }
+
+    // Load saved avatar on init
+    loadAvatar();
+
     $$('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
         $$('.tab').forEach(t => t.classList.remove('active'));
@@ -1067,6 +1199,17 @@
       });
     });
 
+    // Update profile name when typing in name fields
+    const updateProfileName = (name) => {
+      window.userName = name;
+      const nameEl = $('#profile-name');
+      const initialEl = $('#profile-avatar-initial');
+      if (nameEl) nameEl.textContent = name || 'Set your name to start';
+      if (initialEl) initialEl.textContent = getInitial(name);
+    };
+    $('#create-name').addEventListener('input', (e) => updateProfileName(e.target.value.trim()));
+    $('#join-name').addEventListener('input', (e) => updateProfileName(e.target.value.trim()));
+
     $('#btn-create').addEventListener('click', () => {
       const name = $('#create-name').value.trim();
       if (!name) return toast('Enter your name', 'error');
@@ -1075,7 +1218,7 @@
       const password = $('#create-password').value;
       $('#connecting-overlay').classList.add('show');
       setTimeout(() => { if ($('#connecting-overlay').classList.contains('show')) { $('#connecting-overlay').classList.remove('show'); toast('Connection timed out', 'error'); } }, 15000);
-      window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: false, password };
+      window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: false, password, avatar: userAvatar || null };
       connectSocket();
     });
 
@@ -1090,19 +1233,19 @@
       setTimeout(() => { if ($('#connecting-overlay').classList.contains('show')) { $('#connecting-overlay').classList.remove('show'); toast('Connection timed out', 'error'); } }, 15000);
 
       if (!socket || !socket.connected) {
-        window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: true, password };
+        window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: true, password, avatar: userAvatar || null };
         connectSocket();
       } else {
-        socket.emit('join-room', { roomId: code, userName: name, muted: false, joinOnly: true, password });
+        socket.emit('join-room', { roomId: code, userName: name, muted: false, joinOnly: true, password, avatar: userAvatar || null });
       }
     });
 
     $('#modal-submit').addEventListener('click', () => {
       const password = $('#modal-password').value;
       const code = $('#join-code').value.trim().toUpperCase();
-      window._pendingJoin = { roomId: code, userName: window.userName, muted: false, joinOnly: true, password };
+      window._pendingJoin = { roomId: code, userName: window.userName, muted: false, joinOnly: true, password, avatar: userAvatar || null };
       if (socket && socket.connected) {
-        socket.emit('join-room', { roomId: code, userName: window.userName, muted: false, joinOnly: true, password });
+        socket.emit('join-room', { roomId: code, userName: window.userName, muted: false, joinOnly: true, password, avatar: userAvatar || null });
       }
       $('#password-modal').classList.remove('open');
       $('#connecting-overlay').classList.add('show');

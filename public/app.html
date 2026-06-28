@@ -12,7 +12,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.19">
+<link rel="stylesheet" href="/app.css?v=1.0.20">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; }
@@ -20,7 +20,7 @@
   .screen { display: none; width: 100%; height: 100dvh; height: 100vh; }
   .screen.active { display: flex !important; flex-direction: column !important; }
 
-  #lobby.active { justify-content: flex-start; align-items: center; padding-top: 2vh; }
+  #lobby.active { justify-content: flex-start; align-items: stretch; }
 
   /* ROOM LAYOUT - Discord style */
   #room.active { background: #060a12; padding-bottom: env(safe-area-inset-bottom, 8px); }
@@ -261,75 +261,99 @@
 
 <!-- LOBBY SCREEN -->
 <div id="lobby" class="screen active">
-  <div class="lobby-container">
-    <div class="lobby-header">
-      <div class="lobby-logo">🌊</div>
-      <h1>VoiceWave</h1>
-      <p>Crystal-clear real-time voice chat</p>
+  <div class="lobby-layout">
+    <div class="lobby-container">
+      <div class="lobby-header">
+        <div class="lobby-logo">🌊</div>
+        <h1>VoiceWave</h1>
+        <p>Crystal-clear real-time voice chat</p>
+      </div>
+
+      <div class="lobby-card">
+        <div class="lobby-tabs">
+          <button class="tab active" data-tab="create">Create Room</button>
+          <button class="tab" data-tab="join">Join Room</button>
+        </div>
+
+        <div class="tab-content active" id="tab-create">
+          <div class="form-group">
+            <label>Your Name</label>
+            <input type="text" id="create-name" placeholder="Enter your display name" maxlength="20">
+          </div>
+          <div class="form-group">
+            <label>Room Password (optional)</label>
+            <input type="password" id="create-password" placeholder="Leave empty for public room">
+          </div>
+          <button class="btn btn-primary full-width" id="btn-create">Create Room</button>
+        </div>
+
+        <div class="tab-content" id="tab-join">
+          <div class="form-group">
+            <label>Your Name</label>
+            <input type="text" id="join-name" placeholder="Enter your display name" maxlength="20">
+          </div>
+          <div class="form-group">
+            <label>Room Code</label>
+            <input type="text" id="join-code" placeholder="Enter 6-character code" maxlength="6" style="text-transform:uppercase;">
+          </div>
+          <div class="form-group" id="password-group" style="display:none;">
+            <label>Password</label>
+            <input type="password" id="join-password" placeholder="Enter room password">
+          </div>
+          <button class="btn btn-primary full-width" id="btn-join">Join Room</button>
+        </div>
+      </div>
+
+      <div class="feature-pills">
+        <span class="pill">🎙️ P2P Voice</span>
+        <span class="pill">💬 Chat</span>
+        <span class="pill">🔒 Password Rooms</span>
+        <span class="pill">📱 Works Everywhere</span>
+      </div>
+
+      <button id="btn-pwa-install" class="btn btn-primary" style="display:none;margin-top:14px;font-size:0.85rem;padding:10px 24px;">
+        📲 Install App
+      </button>
+
+      <div id="update-section" style="display:none;margin-top:auto;margin-bottom:16px;padding:16px 20px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;width:100%;box-sizing:border-box;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            <span id="update-label" style="font-size:0.88rem;color:#d1d5db;">Checking for updates...</span>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary" id="btn-check-update" style="display:none;font-size:0.8rem;padding:8px 18px;">Check for Updates</button>
+            <button class="btn btn-primary" id="btn-download-update" style="display:none;font-size:0.8rem;padding:8px 18px;">Download</button>
+            <button class="btn btn-primary" id="btn-install-update" style="display:none;font-size:0.8rem;padding:8px 18px;background:#22c55e;">Close & Install</button>
+          </div>
+        </div>
+        <div id="update-progress-bar" style="display:none;margin-top:10px;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">
+          <div id="update-progress-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#22d3ee,#a855f7);border-radius:3px;transition:width 0.3s;"></div>
+        </div>
+        <div id="update-progress-text" style="display:none;font-size:0.75rem;color:#6b7280;margin-top:6px;"></div>
+      </div>
     </div>
 
-    <div class="lobby-card">
-      <div class="lobby-tabs">
-        <button class="tab active" data-tab="create">Create Room</button>
-        <button class="tab" data-tab="join">Join Room</button>
+    <!-- PROFILE SIDEBAR -->
+    <div class="profile-sidebar">
+      <div class="profile-card">
+        <div class="profile-avatar-wrapper" id="profile-avatar-wrapper">
+          <div class="profile-avatar" id="profile-avatar">
+            <span class="profile-avatar-initial" id="profile-avatar-initial">?</span>
+            <img class="profile-avatar-img" id="profile-avatar-img" style="display:none;" alt="Avatar">
+          </div>
+          <div class="profile-avatar-overlay" id="profile-avatar-overlay">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+            <span>Upload</span>
+          </div>
+          <input type="file" id="avatar-input" accept="image/*" style="display:none;">
+        </div>
+        <div class="profile-info">
+          <div class="profile-name" id="profile-name">Set your name to start</div>
+          <div class="profile-hint">Your avatar will be visible in rooms</div>
+        </div>
+        <button class="btn btn-ghost btn-sm profile-remove-btn" id="btn-remove-avatar" style="display:none;">Remove Photo</button>
       </div>
-
-      <div class="tab-content active" id="tab-create">
-        <div class="form-group">
-          <label>Your Name</label>
-          <input type="text" id="create-name" placeholder="Enter your display name" maxlength="20">
-        </div>
-        <div class="form-group">
-          <label>Room Password (optional)</label>
-          <input type="password" id="create-password" placeholder="Leave empty for public room">
-        </div>
-        <button class="btn btn-primary full-width" id="btn-create">Create Room</button>
-      </div>
-
-      <div class="tab-content" id="tab-join">
-        <div class="form-group">
-          <label>Your Name</label>
-          <input type="text" id="join-name" placeholder="Enter your display name" maxlength="20">
-        </div>
-        <div class="form-group">
-          <label>Room Code</label>
-          <input type="text" id="join-code" placeholder="Enter 6-character code" maxlength="6" style="text-transform:uppercase;">
-        </div>
-        <div class="form-group" id="password-group" style="display:none;">
-          <label>Password</label>
-          <input type="password" id="join-password" placeholder="Enter room password">
-        </div>
-        <button class="btn btn-primary full-width" id="btn-join">Join Room</button>
-      </div>
-    </div>
-
-    <div class="feature-pills">
-      <span class="pill">🎙️ P2P Voice</span>
-      <span class="pill">💬 Chat</span>
-      <span class="pill">🔒 Password Rooms</span>
-      <span class="pill">📱 Works Everywhere</span>
-    </div>
-
-    <button id="btn-pwa-install" class="btn btn-primary" style="display:none;margin-top:14px;font-size:0.85rem;padding:10px 24px;">
-      📲 Install App
-    </button>
-
-    <div id="update-section" style="display:none;margin-top:auto;margin-bottom:16px;padding:16px 20px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;width:100%;box-sizing:border-box;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-          <span id="update-label" style="font-size:0.88rem;color:#d1d5db;">Checking for updates...</span>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-primary" id="btn-check-update" style="display:none;font-size:0.8rem;padding:8px 18px;">Check for Updates</button>
-          <button class="btn btn-primary" id="btn-download-update" style="display:none;font-size:0.8rem;padding:8px 18px;">Download</button>
-          <button class="btn btn-primary" id="btn-install-update" style="display:none;font-size:0.8rem;padding:8px 18px;background:#22c55e;">Close & Install</button>
-        </div>
-      </div>
-      <div id="update-progress-bar" style="display:none;margin-top:10px;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">
-        <div id="update-progress-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#22d3ee,#a855f7);border-radius:3px;transition:width 0.3s;"></div>
-      </div>
-      <div id="update-progress-text" style="display:none;font-size:0.75rem;color:#6b7280;margin-top:6px;"></div>
     </div>
   </div>
 </div>
@@ -518,7 +542,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.19';
+  window.APP_VERSION = '1.0.20';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -551,6 +575,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.19"></script>
+<script src="/app.js?v=1.0.20"></script>
 </body>
 </html>
