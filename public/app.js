@@ -33,6 +33,7 @@
   let masterGainNode = null;
   let peers = {};
   let peerStreams = {};
+  let peerForceMuted = {};
   let mySocketId = null;
   let roomId = null;
   let roomPassword = null;
@@ -435,7 +436,8 @@
     grid.appendChild(myCard);
 
     peersList.forEach(p => {
-      const card = createUserCard(p.socketId, p.name, p.muted, p.isCreator, false, p.avatar || null);
+      peerForceMuted[p.socketId] = p.forceMuted || false;
+      const card = createUserCard(p.socketId, p.name, p.muted, p.isCreator, false, p.avatar || null, p.forceMuted);
       grid.appendChild(card);
       // Store avatar in peers object for chat messages
       if (peers[p.socketId]) peers[p.socketId].avatar = p.avatar || null;
@@ -446,7 +448,7 @@
     startSpeakingPoll();
   }
 
-  function createUserCard(socketId, name, muted, isCreator, isLocal, avatar) {
+  function createUserCard(socketId, name, muted, isCreator, isLocal, avatar, forceMuted) {
     const card = document.createElement('div');
     card.className = `user-card ${muted ? 'muted' : ''} ${isCreator ? 'is-admin' : ''}`;
     card.dataset.socket = socketId;
@@ -457,6 +459,15 @@
     const avatarHtml = avatar
       ? `<div class="user-avatar" style="background:${avatarColor};"><img src="${escapeHtml(avatar)}" alt=""></div>`
       : `<div class="user-avatar" style="background:${avatarColor};">${escapeHtml(initial)}</div>`;
+
+    let muteBtnHtml = '';
+    if (!isLocal && window._iAmCreator) {
+      if (muted && forceMuted) {
+        muteBtnHtml = `<div class="user-mute-btn" data-force-mute="${socketId}" title="Unmute user">🔇</div>`;
+      } else if (!muted) {
+        muteBtnHtml = `<div class="user-mute-btn" data-force-mute="${socketId}" title="Mute user">🔊</div>`;
+      }
+    }
 
     card.innerHTML = `
       ${avatarHtml}
@@ -476,19 +487,20 @@
         <div class="meter-bar"></div>
         <div class="meter-bar"></div>
       </div>
-      ${!isLocal && window._iAmCreator ? `<div class="user-actions"><div class="user-kick" data-kick="${socketId}" title="Kick user">✕</div><div class="user-mute-btn" data-force-mute="${socketId}" title="${muted ? 'Unmute user' : 'Mute user'}">${muted ? '🔇' : '🔊'}</div></div>` : ''}
+      ${muteBtnHtml ? `<div class="user-actions"><div class="user-kick" data-kick="${socketId}" title="Kick user">✕</div>${muteBtnHtml}</div>` : ''}
       ${!isLocal ? `<div class="user-volume"><input type="range" min="0" max="100" value="80" data-peer-volume="${socketId}"></div>` : ''}
     `;
 
     return card;
   }
 
-  function addPeerToGrid(socketId, name, muted, isCreator, avatar) {
+  function addPeerToGrid(socketId, name, muted, isCreator, avatar, forceMuted) {
     const grid = $('#user-grid');
     const existing = grid.querySelector(`[data-socket="${socketId}"]`);
     if (existing) existing.remove();
 
-    const card = createUserCard(socketId, name, muted, isCreator, false, avatar || null);
+    peerForceMuted[socketId] = forceMuted || false;
+    const card = createUserCard(socketId, name, muted, isCreator, false, avatar || null, forceMuted);
     grid.appendChild(card);
 
     const count = grid.querySelectorAll('.user-card').length;
@@ -505,6 +517,7 @@
       delete peers[socketId];
     }
     delete peerStreams[socketId];
+    delete peerForceMuted[socketId];
 
     const count = $('#user-grid').querySelectorAll('.user-card').length;
     $('#participant-count').textContent = count;
@@ -546,7 +559,7 @@
     });
   }
 
-  function updatePeerMuted(socketId, muted) {
+  function updatePeerMuted(socketId, muted, forceMuted) {
     const card = $(`[data-socket="${socketId}"]`);
     if (!card) return;
     card.classList.toggle('muted', muted);
@@ -570,8 +583,17 @@
     }
     const muteBtn = card.querySelector('.user-mute-btn');
     if (muteBtn) {
-      muteBtn.textContent = muted ? '🔇' : '🔊';
-      muteBtn.title = muted ? 'Unmute user' : 'Mute user';
+      if (muted && forceMuted) {
+        muteBtn.textContent = '🔇';
+        muteBtn.title = 'Unmute user';
+        muteBtn.style.display = '';
+      } else if (muted && !forceMuted) {
+        muteBtn.style.display = 'none';
+      } else {
+        muteBtn.textContent = '🔊';
+        muteBtn.title = 'Mute user';
+        muteBtn.style.display = '';
+      }
     }
   }
 
@@ -672,7 +694,7 @@
     socket.on('peer-joined', async (data) => {
       createPeerConnection(data.socketId, data.name);
       if (peers[data.socketId]) peers[data.socketId].avatar = data.avatar || null;
-      addPeerToGrid(data.socketId, data.name, data.muted, data.isCreator, data.avatar);
+      addPeerToGrid(data.socketId, data.name, data.muted, data.isCreator, data.avatar, data.forceMuted);
       toast(`${data.name} joined`, 'info');
       // If we somehow don't have the stream on peer connections, add it now
       if (localStream) {
@@ -687,7 +709,9 @@
     });
 
     socket.on('peer-muted', (data) => {
-      updatePeerMuted(data.socketId, data.muted);
+      const fMuted = data.forceMuted !== undefined ? data.forceMuted : false;
+      peerForceMuted[data.socketId] = fMuted;
+      updatePeerMuted(data.socketId, data.muted, fMuted);
       // Handle force mute on self — update local state and UI
       if (data.forced && data.socketId === mySocketId) {
         isForceMuted = data.muted;
@@ -1425,6 +1449,10 @@
         const card = $(`[data-socket="${targetId}"]`);
         const isMuted = card?.classList.contains('muted');
         if (isMuted) {
+          if (!peerForceMuted[targetId]) {
+            toast('User muted themselves — cannot unmute', 'error');
+            return;
+          }
           socket.emit('force-unmute', { roomId, targetId });
         } else {
           socket.emit('force-mute', { roomId, targetId });

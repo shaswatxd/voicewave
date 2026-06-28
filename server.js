@@ -83,10 +83,10 @@ io.on('connection', (socket) => {
 
     const peers = [];
     room.users.forEach((user, id) => {
-      peers.push({ socketId: id, name: user.name, muted: user.muted, isCreator: id === room.creator, avatar: user.avatar || null });
+      peers.push({ socketId: id, name: user.name, muted: user.muted, forceMuted: user.forceMuted || false, isCreator: id === room.creator, avatar: user.avatar || null });
     });
 
-    room.users.set(socket.id, { name: userName, muted: muted || false, avatar: validAvatar });
+    room.users.set(socket.id, { name: userName, muted: muted || false, forceMuted: false, avatar: validAvatar });
     socket.emit('room-joined', {
       roomId,
       peers,
@@ -99,6 +99,7 @@ io.on('connection', (socket) => {
       socketId: socket.id,
       name: userName,
       muted: muted || false,
+      forceMuted: false,
       isCreator: socket.id === room.creator,
       avatar: validAvatar
     });
@@ -130,8 +131,10 @@ io.on('connection', (socket) => {
   socket.on('user-muted', ({ roomId, muted }) => {
     const room = rooms.get(roomId);
     if (room && room.users.has(socket.id)) {
-      room.users.get(socket.id).muted = muted;
-      socket.to(roomId).emit('peer-muted', { socketId: socket.id, muted });
+      const user = room.users.get(socket.id);
+      user.muted = muted;
+      user.forceMuted = false;
+      socket.to(roomId).emit('peer-muted', { socketId: socket.id, muted, forceMuted: false });
     }
   });
 
@@ -188,16 +191,21 @@ io.on('connection', (socket) => {
   socket.on('force-mute', ({ roomId, targetId }) => {
     const room = rooms.get(roomId);
     if (room && room.creator === socket.id && room.users.has(targetId)) {
-      room.users.get(targetId).muted = true;
-      io.to(roomId).emit('peer-muted', { socketId: targetId, muted: true, forced: true });
+      const user = room.users.get(targetId);
+      user.muted = true;
+      user.forceMuted = true;
+      io.to(roomId).emit('peer-muted', { socketId: targetId, muted: true, forced: true, forceMuted: true });
     }
   });
 
   socket.on('force-unmute', ({ roomId, targetId }) => {
     const room = rooms.get(roomId);
     if (room && room.creator === socket.id && room.users.has(targetId)) {
-      room.users.get(targetId).muted = false;
-      io.to(roomId).emit('peer-muted', { socketId: targetId, muted: false, forced: true });
+      const user = room.users.get(targetId);
+      if (!user.forceMuted) return;
+      user.muted = false;
+      user.forceMuted = false;
+      io.to(roomId).emit('peer-muted', { socketId: targetId, muted: false, forced: true, forceMuted: false });
     }
   });
 
