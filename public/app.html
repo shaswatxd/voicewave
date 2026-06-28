@@ -12,7 +12,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.20">
+<link rel="stylesheet" href="/app.css?v=1.0.21">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; }
@@ -484,8 +484,8 @@
     <div class="settings-grid">
       <div class="setting-item">
         <label>Master Volume</label>
-        <input type="range" id="master-volume" min="0" max="100" value="100">
-        <span class="setting-value" id="master-volume-val">100%</span>
+        <input type="range" id="master-volume" min="0" max="100" value="75">
+        <span class="setting-value" id="master-volume-val">75%</span>
       </div>
       <div class="setting-item">
         <label>Mic Gain</label>
@@ -542,7 +542,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.20';
+  window.APP_VERSION = '1.0.21';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -575,6 +575,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.20"></script>
+<script src="/app.js?v=1.0.21"></script>
 </body>
 </html>
