@@ -76,7 +76,7 @@ function createTray() {
     },
     { type: 'separator' },
     {
-      label: 'Toggle Mute',
+      label: isMuted ? 'Unmute' : 'Mute',
       click: () => {
         isMuted = !isMuted;
         if (mainWindow) {
@@ -86,7 +86,7 @@ function createTray() {
       }
     },
     {
-      label: 'Toggle Deafen',
+      label: isDeafened ? 'Undeafen' : 'Deafen',
       click: () => {
         isDeafened = !isDeafened;
         if (mainWindow) {

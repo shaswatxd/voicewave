@@ -281,7 +281,7 @@ body {
   overflow: hidden;
   flex-shrink: 0;
 }
-.chat-panel.open { width: 320px; }
+.chat-panel.open { width: 360px; }
 .chat-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 16px;

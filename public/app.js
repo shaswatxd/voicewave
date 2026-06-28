@@ -271,10 +271,7 @@
       });
     }
 
-    if (rms > threshold) {
-      if (speakingTimeout) clearTimeout(speakingTimeout);
-      speakingTimeout = setTimeout(() => {}, 250);
-    }
+    if (rms > threshold) return;
   }
 
   function createPeerConnection(socketId, name) {
@@ -518,9 +515,6 @@
     const list = $('#pd-list');
     if (!list) return;
     list.innerHTML = '';
-
-    const me = { socketId: mySocketId, name: window.userName || 'You', muted: isMuted, isCreator: isCreator, avatar: userAvatar };
-    const all = [me, ...Object.values(peers).map(p => ({ socketId: p.socketId || p.pc?.id, name: p.name, muted: false, isCreator: false, avatar: p.avatar || null }))];
 
     const cards = $$('#user-grid .user-card');
     const finalList = [];
@@ -785,7 +779,7 @@
         const status = card.querySelector('.user-status');
         if (status) {
           const dot = status.querySelector('.status-dot');
-          if (dot) dot.className = `status-dot ${data.afk ? 'idle' : 'idle'}`;
+          if (dot) dot.className = `status-dot ${data.afk ? 'idle' : 'speaking'}`;
         }
         const statusIcons = card.querySelector('.user-status-icons');
         if (statusIcons) {
@@ -838,11 +832,11 @@
     let fileHtml = '';
     if (data.file) {
       if (data.file.type?.startsWith('image/')) {
-        fileHtml = `<div style="margin-top:8px;"><img src="${data.file.data}" style="max-width:100%;border-radius:10px;border:1px solid rgba(255,255,255,0.06);" /></div>`;
+        fileHtml = `<div style="margin-top:8px;"><img src="${escapeHtml(data.file.data)}" style="max-width:100%;border-radius:10px;border:1px solid rgba(255,255,255,0.06);" /></div>`;
       } else if (data.file.type?.startsWith('video/')) {
-        fileHtml = `<div style="margin-top:8px;"><video src="${data.file.data}" controls preload="metadata" style="max-width:100%;max-height:300px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);"></video></div>`;
+        fileHtml = `<div style="margin-top:8px;"><video src="${escapeHtml(data.file.data)}" controls preload="metadata" style="max-width:100%;max-height:300px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);"></video></div>`;
       } else {
-        fileHtml = `<div class="chat-msg-file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><a href="${data.file.data}" download="${escapeHtml(data.file.name)}">${escapeHtml(data.file.name)}</a></div>`;
+        fileHtml = `<div class="chat-msg-file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><a href="${escapeHtml(data.file.data)}" download="${escapeHtml(data.file.name)}">${escapeHtml(data.file.name)}</a></div>`;
       }
     }
 
@@ -1105,8 +1099,7 @@
 
   function sendFile(file) {
     const isVideo = file.type?.startsWith('video/');
-    const isElectron = !!(window.electronAPI && window.electronAPI.isElectron);
-    if (isVideo && !isElectron) {
+    if (isVideo) {
       toast('Video sharing is only available in the desktop app', 'error');
       return;
     }

@@ -62,17 +62,7 @@ io.on('connection', (socket) => {
       rooms.set(roomId, room);
     }
 
-    if (room.password && room.password !== password && joinOnly) {
-      socket.emit('room-requires-password', { roomId });
-      return;
-    }
-
-    if (room.password && room.password !== password && !joinOnly) {
-      socket.emit('room-requires-password', { roomId });
-      return;
-    }
-
-    if (room.password && password && room.password !== password) {
+    if (room.password && room.password !== password) {
       socket.emit('room-wrong-password', { roomId });
       return;
     }
@@ -147,6 +137,8 @@ io.on('connection', (socket) => {
 
   socket.on('chat-message', (data) => {
     const { roomId } = data;
+    if (!roomId || !data.text || typeof data.text !== 'string') return;
+    if (data.text.length > 500) data.text = data.text.slice(0, 500);
     io.to(roomId).emit('chat-message', {
       ...data,
       socketId: socket.id
