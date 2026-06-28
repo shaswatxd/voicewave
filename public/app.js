@@ -574,6 +574,11 @@
         if (mi) mi.remove();
       }
     }
+    const muteBtn = card.querySelector('.user-mute-btn');
+    if (muteBtn) {
+      muteBtn.textContent = muted ? '🔇' : '🔊';
+      muteBtn.title = muted ? 'Unmute user' : 'Mute user';
+    }
   }
 
   function startSpeakingPoll() {
