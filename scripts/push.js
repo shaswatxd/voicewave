@@ -140,6 +140,233 @@ async function main() {
   }
   ok('All JS files valid');
 
+  // ── STEP 6.5: Dead Code Analysis & Auto-Fix ──
+  log('Step 6.5: Scanning for dead code & auto-fixing...');
+  const analysisFiles = [
+    { path: path.join(ROOT, 'server.js'), env: 'node' },
+    { path: path.join(ROOT, 'main.js'), env: 'node' },
+    { path: path.join(ROOT, 'preload.js'), env: 'node' },
+    { path: path.join(PUB, 'app.js'), env: 'browser' },
+  ];
+
+  const BROWSER_GLOBALS = [
+    'document', 'window', 'navigator', 'console', 'localStorage', 'sessionStorage',
+    'Image', 'FileReader', 'HTMLImageElement', 'RTCPeerConnection', 'RTCSessionDescription',
+    'RTCIceCandidate', 'MediaRecorder', 'Blob', 'URL', 'AudioContext', 'webkitAudioContext',
+    'Audio', 'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval', 'fetch',
+    'XMLHttpRequest', 'Event', 'CustomEvent', 'MutationObserver', 'requestAnimationFrame',
+    'MutationObserver', 'SpeechRecognition', 'webkitSpeechRecognition',
+    'io', 'URLSearchParams', 'CSS', 'Intl',
+    // Web APIs
+    'DOMParser', 'XMLSerializer', 'TextEncoder', 'TextDecoder', 'crypto',
+    'matchMedia', 'requestIdleCallback', 'cancelAnimationFrame',
+  ];
+
+  const NODE_GLOBALS = [
+    'require', 'module', 'exports', '__dirname', '__filename', 'process',
+    'Buffer', 'console', 'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval',
+    'global', 'URL', 'Promise',
+  ];
+
+  const ELECTRON_GLOBALS = [
+    'contextBridge', 'ipcRenderer',
+    'app', 'BrowserWindow', 'Tray', 'Menu', 'ipcMain', 'nativeImage', 'session',
+    'autoUpdater',
+  ];
+
+  let totalDeadFound = 0;
+  let totalAutoFixed = 0;
+
+  for (const file of analysisFiles) {
+    let code = fs.readFileSync(file.path, 'utf8');
+    const originalCode = code;
+    const fileName = path.relative(ROOT, file.path);
+    const issues = [];
+
+    const globals = file.env === 'browser'
+      ? [...BROWSER_GLOBALS, ...ELECTRON_GLOBALS]
+      : [...NODE_GLOBALS, ...ELECTRON_GLOBALS];
+
+    // ── 1. Find unused const/let variables ──
+    const varDeclRegex = /^(?:[ \t]*)(const|let)\s+(\w+)\s*=/gm;
+    let varMatch;
+    while ((varMatch = varDeclRegex.exec(code)) !== null) {
+      const keyword = varMatch[1];
+      const varName = varMatch[2];
+      if (globals.includes(varName)) continue;
+
+      // Count usages of this variable name (word boundary match, excluding the declaration line)
+      const declLine = code.substring(0, varMatch.index).split('\n').length;
+      const usageRegex = new RegExp(`\\b${varName}\\b`, 'g');
+      let usageCount = 0;
+      let usageMatch;
+      while ((usageMatch = usageRegex.exec(code)) !== null) {
+        const usageLine = code.substring(0, usageMatch.index).split('\n').length;
+        if (usageLine !== declLine) usageCount++;
+      }
+
+      if (usageCount === 0) {
+        issues.push({
+          type: 'unused-variable',
+          severity: 'warning',
+          name: varName,
+          keyword: keyword,
+          line: declLine,
+          message: `Unused ${keyword} "${varName}"`
+        });
+      }
+    }
+
+    // ── 2. Find empty function/block bodies ──
+    const emptyBlockRegex = /(?:function\s*\([^)]*\)\s*\{\s*\}|=>\s*\{\s*\}|\(\)\s*=>\s*\{\s*\})/g;
+    let emptyMatch;
+    while ((emptyMatch = emptyBlockRegex.exec(code)) !== null) {
+      const line = code.substring(0, emptyMatch.index).split('\n').length;
+      // Check if it's a catch block or intentional no-op
+      const before = code.substring(Math.max(0, emptyMatch.index - 50), emptyMatch.index);
+      if (!before.includes('catch') && !before.includes('/* ignore */')) {
+        issues.push({
+          type: 'empty-function',
+          severity: 'info',
+          line: line,
+          message: `Empty function body`
+        });
+      }
+    }
+
+    // ── 3. Find redundant ternary (x ? a : a) ──
+    const redundantTernaryRegex = /(\w+)\s*\?\s*([^:]+?)\s*:\s*\2/g;
+    let ternaryMatch;
+    while ((ternaryMatch = redundantTernaryRegex.exec(code)) !== null) {
+      const line = code.substring(0, ternaryMatch.index).split('\n').length;
+      issues.push({
+        type: 'redundant-ternary',
+        severity: 'warning',
+        line: line,
+        message: `Redundant ternary: both branches are identical`
+      });
+    }
+
+    // ── 4. Find dead code after return/throw/break/continue ──
+    const lines = code.split('\n');
+    for (let i = 0; i < lines.length - 1; i++) {
+      const trimmed = lines[i].trim();
+      if (/^(return\b|throw\b|break\b|continue\b)/.test(trimmed) && trimmed.endsWith(';')) {
+        const nextTrimmed = lines[i + 1]?.trim();
+        if (nextTrimmed && nextTrimmed !== '}' && nextTrimmed !== '' &&
+            !nextTrimmed.startsWith('//') && !nextTrimmed.startsWith('/*') &&
+            !nextTrimmed.startsWith('case ') && !nextTrimmed.startsWith('default:') &&
+            !nextTrimmed.startsWith('catch') && !nextTrimmed.startsWith('finally')) {
+          issues.push({
+            type: 'unreachable-code',
+            severity: 'error',
+            line: i + 2,
+            message: `Unreachable code after "${trimmed.split('(')[0].split(' ')[0]}"`
+          });
+        }
+      }
+    }
+
+    // ── 5. Find duplicate consecutive conditions ──
+    for (let i = 0; i < lines.length - 2; i++) {
+      const curr = lines[i].trim();
+      const next = lines[i + 1]?.trim();
+      if (curr.startsWith('if (') && next?.startsWith('if (') && curr === next) {
+        issues.push({
+          type: 'duplicate-condition',
+          severity: 'warning',
+          line: i + 2,
+          message: `Duplicate consecutive if condition`
+        });
+      }
+    }
+
+    // ── 6. Find var declarations (should be const/let) ──
+    const varUsageRegex = /^(?:[ \t]*)(var\s+\w+)/gm;
+    let varUsageMatch;
+    while ((varUsageMatch = varUsageRegex.exec(code)) !== null) {
+      const line = code.substring(0, varUsageMatch.index).split('\n').length;
+      issues.push({
+        type: 'var-declaration',
+        severity: 'warning',
+        line: line,
+        message: `Use "const" or "let" instead of "var"`
+      });
+    }
+
+    // ── 7. Find console.log in production code (server.js, main.js) ──
+    if (file.env === 'node') {
+      const consoleLogRegex = /console\.\w+\(/g;
+      let cLogMatch;
+      while ((cLogMatch = consoleLogRegex.exec(code)) !== null) {
+        const line = code.substring(0, cLogMatch.index).split('\n').length;
+        issues.push({
+          type: 'console-in-prod',
+          severity: 'info',
+          line: line,
+          message: `Console statement in production code`
+        });
+      }
+    }
+
+    // ── AUTO-FIX ──
+    let fixedCount = 0;
+
+    // Fix 1: Remove unused const/let declarations (single-line only)
+    for (const issue of issues) {
+      if (issue.type === 'unused-variable' && issue.severity === 'warning') {
+        const varRegex = new RegExp(`^[ \\t]*${issue.keyword}\\s+${issue.name}\\s*=.*;\\s*$`, 'gm');
+        const newCode = code.replace(varRegex, '');
+        if (newCode !== code) {
+          code = newCode;
+          fixedCount++;
+        }
+      }
+    }
+
+    // Fix 2: Replace redundant ternary with single value
+    code = code.replace(/(\w+)\s*\?\s*([^:]+?)\s*:\s*\2/g, '$2');
+
+    // Fix 3: Convert var to const (simple cases where value is never reassigned)
+    // Skip this - too risky for auto-fix
+
+    // Fix 4: Clean up multiple blank lines (3+ → 2)
+    code = code.replace(/\n{3,}/g, '\n\n');
+
+    // Fix 5: Remove trailing whitespace
+    code = code.replace(/[ \t]+$/gm, '');
+
+    // Write fixed file
+    if (code !== originalCode) {
+      fs.writeFileSync(file.path, code, 'utf8');
+      totalAutoFixed++;
+      ok(`${fileName}: ${fixedCount} issues auto-fixed`);
+    }
+
+    const errors = issues.filter(i => i.severity === 'error');
+    const warnings = issues.filter(i => i.severity === 'warning');
+    const infos = issues.filter(i => i.severity === 'info');
+
+    if (issues.length > 0) {
+      info(`${fileName}: ${errors.length} errors, ${warnings.length} warnings, ${infos.length} info`);
+      for (const issue of issues) {
+        const prefix = issue.severity === 'error' ? '  \x1b[31m✗\x1b[0m' :
+                       issue.severity === 'warning' ? '  \x1b[33m⚠\x1b[0m' :
+                       '  \x1b[36mℹ\x1b[0m';
+        console.log(`${prefix} L${issue.line}: ${issue.message}`);
+      }
+      totalDeadFound += issues.length;
+    } else {
+      ok(`${fileName}: clean`);
+    }
+  }
+
+  if (totalDeadFound > 0) {
+    info(`Total: ${totalDeadFound} issues found, ${totalAutoFixed} files auto-fixed`);
+  } else {
+    ok('No dead code found');
+  }
+
   // ── STEP 7: Check HTML files exist ──
   log('Step 7: Checking HTML files...');
   const htmlFiles = [
