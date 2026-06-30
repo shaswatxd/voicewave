@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -16,8 +17,68 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 3000;
 const MAX_USERS = 30;
 const WARN_USERS = 15;
+const ROOMS_FILE = path.join(__dirname, 'rooms.json');
 
 const rooms = new Map();
+
+// Load persistent rooms from disk
+function loadRoomsFromDisk() {
+  try {
+    if (fs.existsSync(ROOMS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(ROOMS_FILE, 'utf8'));
+      data.forEach(r => {
+        rooms.set(r.id, {
+          id: r.id,
+          users: new Map(), // Active users in memory
+          creator: null,    // Will be assigned on first active user join
+          password: r.password || null,
+          createdAt: r.createdAt || Date.now(),
+          locked: r.locked || false,
+          banned: r.banned || [], // Array of { name, ip }
+          permissions: r.permissions || { allowMic: true, allowChat: true },
+          moderators: r.moderators || [], // Array of usernames or socket IDs
+          history: r.history || [], // Last 50 chat messages
+          polls: r.polls || [], // Active polls
+          pinned: r.pinned || [] // Pinned messages
+        });
+      });
+      console.log(`Loaded ${rooms.size} persistent rooms from disk.`);
+    }
+  } catch (err) {
+    console.error('Error loading rooms.json:', err);
+  }
+}
+
+// Save rooms to disk (excluding active sockets/users Map)
+function saveRoomsToDisk() {
+  try {
+    const data = [];
+    rooms.forEach((room, id) => {
+      // Clean old empty rooms (e.g., older than 7 days and empty) to prevent infinite growth
+      const ageInDays = (Date.now() - room.createdAt) / (1000 * 60 * 60 * 24);
+      if (room.users.size === 0 && ageInDays > 7 && !room.password) {
+        return; // Skip saving and let it expire
+      }
+      data.push({
+        id: room.id,
+        password: room.password,
+        createdAt: room.createdAt,
+        locked: room.locked || false,
+        banned: room.banned || [],
+        permissions: room.permissions || { allowMic: true, allowChat: true },
+        moderators: room.moderators || [],
+        history: room.history || [],
+        polls: room.polls || [],
+        pinned: room.pinned || []
+      });
+    });
+    fs.writeFileSync(ROOMS_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error saving rooms.json:', err);
+  }
+}
+
+loadRoomsFromDisk();
 
 app.use(express.static(path.join(__dirname, 'public'), { noCache: true }));
 
@@ -34,7 +95,8 @@ app.get('/health', (req, res) => {
 });
 
 io.on('connection', (socket) => {
-  console.log(`[Connect] ${socket.id}`);
+  const userIp = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
+  console.log(`[Connect] ${socket.id} (IP: ${userIp})`);
 
   socket.on('join-room', ({ roomId, userName, muted, joinOnly, password, avatar }) => {
     if (!roomId || !userName || roomId.length > 10 || userName.length > 32) {
@@ -42,7 +104,6 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Validate avatar size (max 300KB base64 string)
     const validAvatar = (avatar && typeof avatar === 'string' && avatar.startsWith('data:image') && avatar.length < 400000) ? avatar : null;
 
     let room = rooms.get(roomId);
@@ -57,9 +118,30 @@ io.on('connection', (socket) => {
         users: new Map(),
         creator: socket.id,
         password: password || null,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        locked: false,
+        banned: [],
+        permissions: { allowMic: true, allowChat: true },
+        moderators: [],
+        history: [],
+        polls: [],
+        pinned: []
       };
       rooms.set(roomId, room);
+      saveRoomsToDisk();
+    }
+
+    // 1. Check if room is locked
+    if (room.locked && room.creator !== socket.id && !room.moderators.includes(userName)) {
+      socket.emit('room-locked-error', { roomId });
+      return;
+    }
+
+    // 2. Check if banned
+    const isBanned = room.banned.some(b => b.name === userName || b.ip === userIp);
+    if (isBanned) {
+      socket.emit('room-banned-error', { roomId });
+      return;
     }
 
     if (room.password && room.password !== password) {
@@ -72,27 +154,57 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Assign creator if room was loaded from disk and has no active creator
+    if (!room.creator || room.users.size === 0) {
+      room.creator = socket.id;
+    }
+
     socket.join(roomId);
     socket.roomId = roomId;
+    socket.userName = userName;
 
     const userCount = room.users.size + 1;
 
     if (userCount >= WARN_USERS && userCount < MAX_USERS) {
-      io.to(roomId).emit('room-warning', { count: userCount, max: MAX_USERS, message: `Room has ${userCount} members. Quality may degrade after ${MAX_USERS}.` });
+      io.to(roomId).emit('room-warning', { count: userCount, max: MAX_USERS, message: `Room has ${userCount} members. Quality may degrade.` });
     }
 
     const peers = [];
     room.users.forEach((user, id) => {
-      peers.push({ socketId: id, name: user.name, muted: user.muted, forceMuted: user.forceMuted || false, isCreator: id === room.creator, avatar: user.avatar || null });
+      peers.push({
+        socketId: id,
+        name: user.name,
+        muted: user.muted,
+        forceMuted: user.forceMuted || false,
+        isCreator: id === room.creator,
+        isModerator: room.moderators.includes(user.name),
+        status: user.status || 'online',
+        handRaised: user.handRaised || false,
+        avatar: user.avatar || null
+      });
     });
 
-    room.users.set(socket.id, { name: userName, muted: muted || false, forceMuted: false, avatar: validAvatar });
+    room.users.set(socket.id, {
+      name: userName,
+      muted: muted || false,
+      forceMuted: false,
+      status: 'online',
+      handRaised: false,
+      avatar: validAvatar
+    });
+
     socket.emit('room-joined', {
       roomId,
       peers,
       isCreator: socket.id === room.creator,
       creatorSocketId: room.creator,
-      hasPassword: !!room.password
+      hasPassword: !!room.password,
+      locked: room.locked,
+      permissions: room.permissions,
+      moderators: room.moderators,
+      history: room.history, // Send last 50 messages
+      polls: room.polls, // Send active polls
+      pinned: room.pinned // Send pinned messages
     });
 
     socket.to(roomId).emit('peer-joined', {
@@ -101,6 +213,9 @@ io.on('connection', (socket) => {
       muted: muted || false,
       forceMuted: false,
       isCreator: socket.id === room.creator,
+      isModerator: room.moderators.includes(userName),
+      status: 'online',
+      handRaised: false,
       avatar: validAvatar
     });
 
@@ -138,32 +253,160 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 💬 Chat messages with history & whispers
   socket.on('chat-message', (data) => {
-    const { roomId } = data;
-    if (!roomId || !data.text || typeof data.text !== 'string') return;
+    const { roomId, whisperTo } = data;
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    // Check chat permission
+    if (!room.permissions.allowChat && room.creator !== socket.id && !room.moderators.includes(socket.userName)) {
+      socket.emit('permission-error', { message: 'Chatting is disabled by host.' });
+      return;
+    }
+
+    if (!data.text || typeof data.text !== 'string') return;
     if (data.text.length > 500) data.text = data.text.slice(0, 500);
-    io.to(roomId).emit('chat-message', {
+
+    const messagePayload = {
       ...data,
-      socketId: socket.id
-    });
+      socketId: socket.id,
+      name: socket.userName || data.name,
+      timestamp: Date.now()
+    };
+
+    if (whisperTo) {
+      // Whisper (Private DM)
+      const recipient = io.sockets.sockets.get(whisperTo);
+      if (recipient) {
+        recipient.emit('chat-message', { ...messagePayload, isWhisper: true, toName: recipient.userName });
+        socket.emit('chat-message', { ...messagePayload, isWhisper: true, toName: recipient.userName });
+      }
+    } else {
+      // Public chat: push to history
+      room.history.push(messagePayload);
+      if (room.history.length > 50) room.history.shift();
+      io.to(roomId).emit('chat-message', messagePayload);
+      saveRoomsToDisk();
+    }
   });
 
+  // Delete message
   socket.on('delete-chat-message', ({ roomId, msgId }) => {
     const room = rooms.get(roomId);
-    const isCreator = room && room.creator === socket.id;
-    io.to(roomId).emit('chat-message-deleted', {
-      msgId,
-      deletedBy: socket.id,
-      isCreator
-    });
+    if (!room) return;
+    const isCreator = room.creator === socket.id;
+    const isMod = room.moderators.includes(socket.userName);
+
+    if (isCreator || isMod) {
+      room.history = room.history.filter(m => m.msgId !== msgId);
+      io.to(roomId).emit('chat-message-deleted', { msgId, deletedBy: socket.id, isCreator });
+      saveRoomsToDisk();
+    }
   });
 
+  // Message Reactions
+  socket.on('message-reaction', ({ roomId, msgId, reaction }) => {
+    const room = rooms.get(roomId);
+    if (!room) return;
+    const msg = room.history.find(m => m.msgId === msgId);
+    if (msg) {
+      if (!msg.reactions) msg.reactions = {};
+      if (!msg.reactions[reaction]) msg.reactions[reaction] = [];
+
+      const userIndex = msg.reactions[reaction].indexOf(socket.userName);
+      if (userIndex > -1) {
+        msg.reactions[reaction].splice(userIndex, 1); // remove reaction
+        if (msg.reactions[reaction].length === 0) delete msg.reactions[reaction];
+      } else {
+        msg.reactions[reaction].push(socket.userName); // add reaction
+      }
+      io.to(roomId).emit('message-reactions-updated', { msgId, reactions: msg.reactions });
+      saveRoomsToDisk();
+    }
+  });
+
+  // Pin Message
+  socket.on('pin-message', ({ roomId, msgId, pin }) => {
+    const room = rooms.get(roomId);
+    if (!room) return;
+    const isCreator = room.creator === socket.id;
+    const isMod = room.moderators.includes(socket.userName);
+    if (!isCreator && !isMod) return;
+
+    if (pin) {
+      const msg = room.history.find(m => m.msgId === msgId);
+      if (msg && !room.pinned.some(p => p.msgId === msgId)) {
+        room.pinned.push(msg);
+      }
+    } else {
+      room.pinned = room.pinned.filter(p => p.msgId !== msgId);
+    }
+    io.to(roomId).emit('pinned-messages-updated', { pinned: room.pinned });
+    saveRoomsToDisk();
+  });
+
+  // 📊 Polls and voting
+  socket.on('create-poll', ({ roomId, question, options }) => {
+    const room = rooms.get(roomId);
+    if (!room) return;
+    const isCreator = room.creator === socket.id;
+    const isMod = room.moderators.includes(socket.userName);
+    if (!isCreator && !isMod) return;
+
+    const poll = {
+      id: `poll-${Date.now()}`,
+      question,
+      creator: socket.userName,
+      options: options.map(o => ({ text: o, votes: [] })) // votes is array of userNames
+    };
+
+    room.polls.push(poll);
+    io.to(roomId).emit('poll-created', poll);
+    saveRoomsToDisk();
+  });
+
+  socket.on('cast-vote', ({ roomId, pollId, optionIndex }) => {
+    const room = rooms.get(roomId);
+    if (!room) return;
+    const poll = room.polls.find(p => p.id === pollId);
+    if (poll) {
+      // Remove user's previous votes in this poll
+      poll.options.forEach(o => {
+        const index = o.votes.indexOf(socket.userName);
+        if (index > -1) o.votes.splice(index, 1);
+      });
+      // Add vote to the new option
+      poll.options[optionIndex].votes.push(socket.userName);
+      io.to(roomId).emit('poll-updated', poll);
+      saveRoomsToDisk();
+    }
+  });
+
+  // Typing state
   socket.on('typing-start', ({ roomId }) => {
     socket.to(roomId).emit('typing-start', { socketId: socket.id });
   });
 
   socket.on('typing-stop', ({ roomId }) => {
     socket.to(roomId).emit('typing-stop', { socketId: socket.id });
+  });
+
+  // User Status & Hand Raise
+  socket.on('update-status', ({ roomId, status }) => {
+    const room = rooms.get(roomId);
+    if (room && room.users.has(socket.id)) {
+      room.users.get(socket.id).status = status;
+      io.to(roomId).emit('peer-status-updated', { socketId: socket.id, status });
+    }
+  });
+
+  socket.on('hand-raise', ({ roomId, raised }) => {
+    const room = rooms.get(roomId);
+    if (room && room.users.has(socket.id)) {
+      room.users.get(socket.id).handRaised = raised;
+      io.to(roomId).emit('peer-hand-raised', { socketId: socket.id, name: socket.userName, raised });
+    }
   });
 
   socket.on('afk-status', ({ roomId, afk }) => {
@@ -174,9 +417,81 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('peer-soundboard-play', { socketId: socket.id, soundId });
   });
 
-  socket.on('kick-user', ({ roomId, targetId }) => {
+  // 🛡️ Admin & Moderation Controls
+  socket.on('toggle-lock', ({ roomId, locked }) => {
+    const room = rooms.get(roomId);
+    if (!room) return;
+    const isCreator = room.creator === socket.id;
+    const isMod = room.moderators.includes(socket.userName);
+    if (isCreator || isMod) {
+      room.locked = locked;
+      io.to(roomId).emit('room-lock-changed', { locked });
+      saveRoomsToDisk();
+    }
+  });
+
+  socket.on('ban-user', ({ roomId, targetId }) => {
+    const room = rooms.get(roomId);
+    if (!room) return;
+    const isCreator = room.creator === socket.id;
+    const isMod = room.moderators.includes(socket.userName);
+    if ((isCreator || isMod) && room.users.has(targetId)) {
+      const targetUser = room.users.get(targetId);
+      const targetSocket = io.sockets.sockets.get(targetId);
+      const targetIp = targetSocket ? (targetSocket.handshake.headers['x-forwarded-for'] || targetSocket.handshake.address) : '';
+
+      room.banned.push({ name: targetUser.name, ip: targetIp });
+      io.to(roomId).emit('user-banned-notification', { name: targetUser.name });
+
+      if (targetSocket) {
+        targetSocket.emit('kicked-banned', { roomId, banned: true });
+        targetSocket.leave(roomId);
+        targetSocket.roomId = null;
+      }
+      room.users.delete(targetId);
+      io.to(roomId).emit('peer-left', { socketId: targetId });
+      saveRoomsToDisk();
+    }
+  });
+
+  socket.on('toggle-permission', ({ roomId, permission, value }) => {
+    const room = rooms.get(roomId);
+    if (room && room.creator === socket.id) {
+      room.permissions[permission] = value;
+      io.to(roomId).emit('permissions-updated', { permissions: room.permissions });
+      saveRoomsToDisk();
+    }
+  });
+
+  socket.on('toggle-moderator', ({ roomId, targetName, value }) => {
+    const room = rooms.get(roomId);
+    if (room && room.creator === socket.id) {
+      const index = room.moderators.indexOf(targetName);
+      if (value && index === -1) {
+        room.moderators.push(targetName);
+      } else if (!value && index > -1) {
+        room.moderators.splice(index, 1);
+      }
+      io.to(roomId).emit('moderators-updated', { moderators: room.moderators });
+      saveRoomsToDisk();
+    }
+  });
+
+  socket.on('transfer-creator', ({ roomId, targetId }) => {
     const room = rooms.get(roomId);
     if (room && room.creator === socket.id && room.users.has(targetId)) {
+      room.creator = targetId;
+      io.to(roomId).emit('new-creator', { socketId: targetId });
+      saveRoomsToDisk();
+    }
+  });
+
+  socket.on('kick-user', ({ roomId, targetId }) => {
+    const room = rooms.get(roomId);
+    if (!room) return;
+    const isCreator = room.creator === socket.id;
+    const isMod = room.moderators.includes(socket.userName);
+    if ((isCreator || isMod) && room.users.has(targetId)) {
       io.to(targetId).emit('kicked', { roomId });
       const targetSocket = io.sockets.sockets.get(targetId);
       if (targetSocket) {
@@ -190,7 +505,10 @@ io.on('connection', (socket) => {
 
   socket.on('force-mute', ({ roomId, targetId }) => {
     const room = rooms.get(roomId);
-    if (room && room.creator === socket.id && room.users.has(targetId)) {
+    if (!room) return;
+    const isCreator = room.creator === socket.id;
+    const isMod = room.moderators.includes(socket.userName);
+    if ((isCreator || isMod) && room.users.has(targetId)) {
       const user = room.users.get(targetId);
       user.muted = true;
       user.forceMuted = true;
@@ -200,7 +518,10 @@ io.on('connection', (socket) => {
 
   socket.on('force-unmute', ({ roomId, targetId }) => {
     const room = rooms.get(roomId);
-    if (room && room.creator === socket.id && room.users.has(targetId)) {
+    if (!room) return;
+    const isCreator = room.creator === socket.id;
+    const isMod = room.moderators.includes(socket.userName);
+    if ((isCreator || isMod) && room.users.has(targetId)) {
       const user = room.users.get(targetId);
       if (!user.forceMuted) return;
       user.muted = false;
@@ -231,12 +552,21 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('peer-left', { socketId: sock.id });
 
     if (room.users.size === 0) {
-      rooms.delete(roomId);
-      console.log(`[Room Deleted] ${roomId}`);
+      // If it doesn't have a password or custom configurations, we can delete it from active memory,
+      // but keep it in rooms.json if persistent config is needed.
+      if (!room.password && room.banned.length === 0 && room.polls.length === 0 && room.history.length === 0) {
+        rooms.delete(roomId);
+        console.log(`[Room Deleted] ${roomId}`);
+      } else {
+        // Creator is unset when room is empty, first person to join will reclaim
+        room.creator = null;
+      }
+      saveRoomsToDisk();
     } else if (sock.id === room.creator) {
       const newCreator = room.users.keys().next().value;
       room.creator = newCreator;
       io.to(roomId).emit('new-creator', { socketId: newCreator });
+      saveRoomsToDisk();
     }
 
     console.log(`[Leave] ${sock.id} from ${roomId} (${room.users.size} users)`);

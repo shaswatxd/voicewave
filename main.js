@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, globalShortcut } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
@@ -433,6 +433,14 @@ app.whenReady().then(() => {
   createTray();
   setupAutoUpdater();
 
+  // Register Global Hotkeys
+  globalShortcut.register('CommandOrControl+Shift+M', () => {
+    if (mainWindow) mainWindow.webContents.send('tray-mute-toggle');
+  });
+  globalShortcut.register('CommandOrControl+Shift+D', () => {
+    if (mainWindow) mainWindow.webContents.send('tray-deafen-toggle');
+  });
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -441,6 +449,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  globalShortcut.unregisterAll();
   if (tray) {
     tray.destroy();
     tray = null;
