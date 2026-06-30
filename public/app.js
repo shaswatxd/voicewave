@@ -856,6 +856,19 @@
     }
   }
 
+  function playSound(soundId) {
+    try {
+      const audio = new Audio(`/sounds/${soundId}.mp3`);
+      audio.volume = 0.6;
+      audio.play().catch(err => {
+        console.warn('[VoiceWave] MP3 play failed, falling back to synth:', err);
+        playSynthSound(soundId);
+      });
+    } catch (e) {
+      playSynthSound(soundId);
+    }
+  }
+
   // ── CANVAS VISUALIZER FOR SETTINGS ──
   function startVisualizer() {
     if (!analyserNode) return;
@@ -1249,7 +1262,7 @@
     });
 
     socket.on('peer-soundboard-play', (data) => {
-      playSynthSound(data.soundId);
+      playSound(data.soundId);
       const name = peers[data.socketId]?.name || 'Someone';
       toast(`${name} played ${SOUNDS[data.soundId] || data.soundId}`, 'info');
     });
@@ -1950,7 +1963,7 @@
     $$('.sound-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const soundId = btn.dataset.sound;
-        playSynthSound(soundId);
+        playSound(soundId);
         socket.emit('soundboard-play', { roomId, soundId });
         $('#soundboard-modal').classList.remove('open');
       });
@@ -2244,7 +2257,7 @@
       // 4. Toggle Moderator
       const modBtn = e.target.closest('[data-mod-toggle]');
       if (modBtn) {
-        const targetId = modBtn.dataset.mod-toggle;
+        const targetId = modBtn.dataset.modToggle;
         const name = $(`[data-socket="${targetId}"]`)?.dataset.name || 'user';
         const isCurrentlyMod = roomModerators.includes(name);
         socket.emit('toggle-moderator', { roomId, targetName: name, value: !isCurrentlyMod });
@@ -2286,19 +2299,19 @@
       // 7. Message Action: Delete Message
       const actDel = e.target.closest('[data-act-del]');
       if (actDel) {
-        socket.emit('delete-chat-message', { roomId, msgId: actDel.dataset.act-del });
+        socket.emit('delete-chat-message', { roomId, msgId: actDel.dataset.actDel });
       }
 
       // 8. Message Action: Pin Message
       const actPin = e.target.closest('[data-act-pin]');
       if (actPin) {
-        socket.emit('pin-message', { roomId, msgId: actPin.dataset.act-pin, pin: true });
+        socket.emit('pin-message', { roomId, msgId: actPin.dataset.actPin, pin: true });
       }
 
       // 9. Message Action: Reply Message
       const actReply = e.target.closest('[data-act-reply]');
       if (actReply) {
-        const msgId = actReply.dataset.act-reply;
+        const msgId = actReply.dataset.actReply;
         const msgEl = $(`[data-msgid="${msgId}"]`);
         const author = msgEl.querySelector('.chat-msg-name')?.textContent || 'User';
         const text = msgEl.querySelector('.chat-msg-text')?.textContent || '';
@@ -2312,7 +2325,7 @@
       // 10. Message Action: Add Reaction Popup
       const actReact = e.target.closest('[data-act-react]');
       if (actReact) {
-        const msgId = actReact.dataset.act-react;
+        const msgId = actReact.dataset.actReact;
         const existingPopup = $('.reaction-select-popup');
         if (existingPopup) existingPopup.remove();
 
