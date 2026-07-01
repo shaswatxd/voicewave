@@ -864,6 +864,21 @@
         console.warn('[VoiceWave] MP3 play failed, falling back to synth:', err);
         playSynthSound(soundId);
       });
+      // Limit Sad sound effect duration to 5 seconds with a smooth fade out
+      if (soundId === 'sad') {
+        setTimeout(() => {
+          let vol = audio.volume;
+          const fade = setInterval(() => {
+            if (vol > 0.05) {
+              vol -= 0.05;
+              audio.volume = Math.max(0, vol);
+            } else {
+              clearInterval(fade);
+              audio.pause();
+            }
+          }, 50);
+        }, 4500);
+      }
     } catch (e) {
       playSynthSound(soundId);
     }
