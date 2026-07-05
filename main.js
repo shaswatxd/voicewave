@@ -469,6 +469,11 @@ ipcMain.on('update-room-state', (event, inRoomState) => {
 // ── AUTO UPDATER ──
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.logger = console;
+autoUpdater.requestHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+  'Pragma': 'no-cache'
+};
 
 function setupAutoUpdater() {
   autoUpdater.on('checking-for-update', () => {
@@ -491,8 +496,9 @@ function setupAutoUpdater() {
     if (mainWindow) mainWindow.webContents.send('update-status', { status: 'ready' });
   });
 
-  autoUpdater.on('error', () => {
-    if (mainWindow) mainWindow.webContents.send('update-status', { status: 'error' });
+  autoUpdater.on('error', (err) => {
+    console.error('[VoiceWave] AutoUpdater Error:', err);
+    if (mainWindow) mainWindow.webContents.send('update-status', { status: 'error', message: err ? err.message : 'Unknown error' });
   });
 
   setTimeout(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 5000);

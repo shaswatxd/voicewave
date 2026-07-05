@@ -84,8 +84,9 @@ async function main() {
     const localAppData = process.env.LOCALAPPDATA || '';
     const electronCache = path.join(localAppData, 'VoiceWave');
     const electronCacheAlt = path.join(localAppData, 'voicewave');
+    const updaterCache = path.join(localAppData, 'voicewave-updater');
     const userData = path.join(localAppData, 'Programs', 'VoiceWave');
-    [electronCache, electronCacheAlt].forEach(dir => {
+    [electronCache, electronCacheAlt, updaterCache].forEach(dir => {
       if (fs.existsSync(dir)) {
         fs.rmSync(dir, { recursive: true, force: true });
         ok(`Cleared: ${path.basename(dir)}`);

@@ -27,6 +27,7 @@
 
   const UI_SOUNDS = {
     play(type) {
+      if (!soundNotifications) return;
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = ctx.createOscillator();
@@ -35,32 +36,33 @@
         gain.connect(ctx.destination);
 
         const now = ctx.currentTime;
+        const volumeMultiplier = soundboardVolume / 100;
         if (type === 'join') {
           osc.frequency.setValueAtTime(440, now);
           osc.frequency.setValueAtTime(554, now + 0.08);
           osc.frequency.setValueAtTime(659, now + 0.16);
-          gain.gain.setValueAtTime(0.08, now);
-          gain.gain.exponentialRampToValueAtTime(0.005, now + 0.35);
+          gain.gain.setValueAtTime(0.08 * volumeMultiplier, now);
+          gain.gain.exponentialRampToValueAtTime(0.005 * volumeMultiplier, now + 0.35);
           osc.start();
           osc.stop(now + 0.35);
         } else if (type === 'leave') {
           osc.frequency.setValueAtTime(587, now);
           osc.frequency.exponentialRampToValueAtTime(293, now + 0.25);
-          gain.gain.setValueAtTime(0.08, now);
-          gain.gain.exponentialRampToValueAtTime(0.005, now + 0.25);
+          gain.gain.setValueAtTime(0.08 * volumeMultiplier, now);
+          gain.gain.exponentialRampToValueAtTime(0.005 * volumeMultiplier, now + 0.25);
           osc.start();
           osc.stop(now + 0.25);
         } else if (type === 'msg') {
           osc.frequency.setValueAtTime(784, now);
-          gain.gain.setValueAtTime(0.05, now);
-          gain.gain.exponentialRampToValueAtTime(0.005, now + 0.12);
+          gain.gain.setValueAtTime(0.05 * volumeMultiplier, now);
+          gain.gain.exponentialRampToValueAtTime(0.005 * volumeMultiplier, now + 0.12);
           osc.start();
           osc.stop(now + 0.12);
         } else if (type === 'hand') {
           osc.frequency.setValueAtTime(523, now);
           osc.frequency.setValueAtTime(698, now + 0.06);
-          gain.gain.setValueAtTime(0.08, now);
-          gain.gain.exponentialRampToValueAtTime(0.005, now + 0.22);
+          gain.gain.setValueAtTime(0.08 * volumeMultiplier, now);
+          gain.gain.exponentialRampToValueAtTime(0.005 * volumeMultiplier, now + 0.22);
           osc.start();
           osc.stop(now + 0.22);
         }
@@ -570,7 +572,7 @@
     const grid = $('#user-grid');
     grid.innerHTML = '';
 
-    const myCard = createUserCard(mySocketId, window.userName || 'You', isMuted, isCreator, true, userAvatar, false, myStatus, handRaised, roomModerators.includes(window.userName));
+    const myCard = createUserCard(mySocketId, window.userName || 'You', isMuted, isCreator, true, getAvatarPayload(), false, myStatus, handRaised, roomModerators.includes(window.userName));
     grid.appendChild(myCard);
 
     peersList.forEach(p => {
@@ -909,7 +911,7 @@
   function playSound(soundId) {
     try {
       const audio = new Audio(`/sounds/${soundId}.mp3`);
-      audio.volume = 0.6;
+      audio.volume = soundboardVolume / 100;
       audio.play().catch(err => {
         console.warn('[VoiceWave] MP3 play failed, falling back to synth:', err);
         playSynthSound(soundId);
@@ -1850,6 +1852,55 @@
     return el;
   }
 
+  function applyChatTextSize(size) {
+    const container = $('#chat-messages');
+    if (!container) return;
+    container.classList.remove('chat-size-small', 'chat-size-medium', 'chat-size-large');
+    container.classList.add(`chat-size-${size}`);
+  }
+
+  function applyWallpaper(wp) {
+    document.body.classList.remove('wp-cosmic', 'wp-obsidian', 'wp-forest', 'wp-glass');
+    document.body.classList.add(`wp-${wp}`);
+  }
+
+  function loadLocalSettings() {
+    const sbVolumeInput = $('#setting-soundboard-volume');
+    if (sbVolumeInput) {
+      sbVolumeInput.value = soundboardVolume;
+      const sbVal = $('#soundboard-volume-val');
+      if (sbVal) sbVal.textContent = soundboardVolume + '%';
+    }
+
+    const chatSizeSelect = $('#setting-chat-size');
+    if (chatSizeSelect) {
+      chatSizeSelect.value = chatTextSize;
+    }
+    applyChatTextSize(chatTextSize);
+
+    const wallpaperSelect = $('#setting-wallpaper');
+    if (wallpaperSelect) {
+      wallpaperSelect.value = roomWallpaper;
+    }
+    applyWallpaper(roomWallpaper);
+
+    const soundNotifyCheck = $('#setting-sound-notifications');
+    if (soundNotifyCheck) {
+      soundNotifyCheck.checked = soundNotifications;
+    }
+
+    const statusTextInput = $('#profile-status-text');
+    if (statusTextInput) {
+      statusTextInput.value = myStatusText;
+    }
+
+    const avatarColorSelect = $('#profile-avatar-color');
+    if (avatarColorSelect) {
+      avatarColorSelect.value = myAvatarColor;
+    }
+    updateProfileAvatarColorOrText();
+  }
+
   function initEventListeners() {
     if ('ontouchstart' in window && window.innerWidth <= 768) {
       const eb = $('#emoji-bar');
@@ -1858,6 +1909,9 @@
 
     // Set Initial Theme
     applyTheme(localTheme);
+
+    // Load custom settings
+    loadLocalSettings();
 
     // Drag and Drop
     setupDragAndDrop();
@@ -2118,7 +2172,7 @@
       const password = $('#create-password').value;
       $('#connecting-overlay').classList.add('show');
       setTimeout(() => { if ($('#connecting-overlay').classList.contains('show')) { $('#connecting-overlay').classList.remove('show'); toast('Connection timed out', 'error'); } }, 15000);
-      window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: false, password, avatar: userAvatar || null };
+      window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: false, password, avatar: getAvatarPayload() };
       connectSocket();
     });
 
@@ -2133,19 +2187,19 @@
       setTimeout(() => { if ($('#connecting-overlay').classList.contains('show')) { $('#connecting-overlay').classList.remove('show'); toast('Connection timed out', 'error'); } }, 15000);
 
       if (!socket || !socket.connected) {
-        window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: true, password, avatar: userAvatar || null };
+        window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: true, password, avatar: getAvatarPayload() };
         connectSocket();
       } else {
-        socket.emit('join-room', { roomId: code, userName: name, muted: false, joinOnly: true, password, avatar: userAvatar || null });
+        socket.emit('join-room', { roomId: code, userName: name, muted: false, joinOnly: true, password, avatar: getAvatarPayload() });
       }
     });
 
     $('#modal-submit').addEventListener('click', () => {
       const password = $('#modal-password').value;
       const code = $('#join-code').value.trim().toUpperCase();
-      window._pendingJoin = { roomId: code, userName: window.userName, muted: false, joinOnly: true, password, avatar: userAvatar || null };
+      window._pendingJoin = { roomId: code, userName: window.userName, muted: false, joinOnly: true, password, avatar: getAvatarPayload() };
       if (socket && socket.connected) {
-        socket.emit('join-room', { roomId: code, userName: window.userName, muted: false, joinOnly: true, password, avatar: userAvatar || null });
+        socket.emit('join-room', { roomId: code, userName: window.userName, muted: false, joinOnly: true, password, avatar: getAvatarPayload() });
       }
       $('#password-modal').classList.remove('open');
       $('#connecting-overlay').classList.add('show');
@@ -2233,6 +2287,47 @@
     $('#master-volume').addEventListener('input', (e) => {
       if (masterGainNode) masterGainNode.gain.value = e.target.value / 100;
       $('#master-volume-val').textContent = e.target.value + '%';
+    });
+
+    $('#setting-soundboard-volume')?.addEventListener('input', (e) => {
+      soundboardVolume = parseInt(e.target.value);
+      localStorage.setItem('vw_sb_volume', soundboardVolume);
+      $('#soundboard-volume-val').textContent = soundboardVolume + '%';
+    });
+
+    $('#setting-chat-size')?.addEventListener('change', (e) => {
+      chatTextSize = e.target.value;
+      localStorage.setItem('vw_chat_size', chatTextSize);
+      applyChatTextSize(chatTextSize);
+    });
+
+    $('#setting-wallpaper')?.addEventListener('change', (e) => {
+      roomWallpaper = e.target.value;
+      localStorage.setItem('vw_wallpaper', roomWallpaper);
+      applyWallpaper(roomWallpaper);
+    });
+
+    $('#setting-sound-notifications')?.addEventListener('change', (e) => {
+      soundNotifications = e.target.checked;
+      localStorage.setItem('vw_sound_notifications', soundNotifications);
+    });
+
+    $('#profile-status-text')?.addEventListener('input', (e) => {
+      myStatusText = e.target.value.trim();
+      localStorage.setItem('vw_status_text', myStatusText);
+      updateProfileAvatarColorOrText();
+      if (roomId && socket && socket.connected) {
+        socket.emit('join-room', { roomId, userName: window.userName, muted: isMuted, joinOnly: true, password: roomPassword, avatar: getAvatarPayload() });
+      }
+    });
+
+    $('#profile-avatar-color')?.addEventListener('change', (e) => {
+      myAvatarColor = e.target.value;
+      localStorage.setItem('vw_avatar_color', myAvatarColor);
+      updateProfileAvatarColorOrText();
+      if (roomId && socket && socket.connected) {
+        socket.emit('join-room', { roomId, userName: window.userName, muted: isMuted, joinOnly: true, password: roomPassword, avatar: getAvatarPayload() });
+      }
     });
 
     $('#mic-gain').addEventListener('input', (e) => {
@@ -2576,7 +2671,7 @@
           progressText.style.display = 'none';
           break;
         case 'error':
-          updateLabel.textContent = 'Update check failed';
+          updateLabel.textContent = `Update check failed: ${data.message || 'Unknown error'}`;
           updateLabel.style.color = '#ef4444';
           btnCheck.style.display = 'inline-flex';
           btnDownload.style.display = 'none';
