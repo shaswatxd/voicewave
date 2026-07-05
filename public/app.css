@@ -567,6 +567,16 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
 .titlebar-title {
   font-size: 0.72rem; font-weight: 600; color: var(--muted);
   letter-spacing: 0.04em;
+  display: flex; align-items: center; gap: 6px;
+}
+.titlebar-icon {
+  width: 22px; height: 22px; border-radius: 5px;
+  object-fit: cover; vertical-align: middle;
+  animation: iconPulse 3s ease-in-out infinite;
+}
+@keyframes iconPulse {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(34,211,238,0.3)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 6px rgba(34,211,238,0.6)); transform: scale(1.08); }
 }
 .titlebar-buttons {
   display: flex; align-items: center;
