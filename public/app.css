@@ -121,7 +121,7 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
   width: 100%; flex: 1;
   display: flex; flex-direction: column;
   align-items: center; justify-content: flex-start;
-  padding: 4vh 24px 2vh;
+  padding: 10vh 24px 2vh;
   position: relative;
   overflow-y: auto;
 }
