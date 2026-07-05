@@ -12,7 +12,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.34">
+<link rel="stylesheet" href="/app.css?v=1.0.35">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; }
@@ -23,7 +23,7 @@
   #lobby.active { justify-content: flex-start; align-items: stretch; }
 
   /* ROOM LAYOUT - Discord style */
-  #room.active { background: #060a12; padding-bottom: env(safe-area-inset-bottom, 8px); }
+  #room.active { background: var(--bg); padding-bottom: env(safe-area-inset-bottom, 8px); }
 
   .titlebar { display: flex; align-items: center; justify-content: space-between; height: 36px; background: #040810; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; user-select: none; z-index: 500; }
   .titlebar-drag { flex: 1; display: flex; align-items: center; padding-left: 14px; -webkit-app-region: drag; }
@@ -354,11 +354,25 @@
         <div class="profile-info">
           <div class="profile-name" id="profile-name">Set your name to start</div>
           <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
-            <select id="profile-status-select" class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; color:#f0f4ff; cursor:pointer; width:100%; outline:none; font-size:0.78rem;">
+            <select id="profile-status-select" class="btn btn-ghost btn-sm" style="border-radius:8px; cursor:pointer; width:100%; outline:none; font-size:0.78rem;">
               <option value="online">🟢 Online</option>
               <option value="idle">🌙 Idle</option>
               <option value="dnd">🔴 Do Not Disturb</option>
             </select>
+            <div style="margin-top: 4px; text-align: left;">
+              <input type="text" id="profile-status-text" placeholder="Status: What's on your mind?" maxlength="40" style="padding: 8px 12px; font-size: 0.78rem; margin: 0; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; color: var(--text); width: 100%;">
+            </div>
+            <div style="margin-top: 4px; text-align: left;">
+              <select id="profile-avatar-color" style="padding: 8px 12px; font-size: 0.78rem; margin: 0; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; color: var(--text); width: 100%; cursor: pointer;">
+                <option value="cyan">Cyan Glow</option>
+                <option value="purple">Purple Haze</option>
+                <option value="pink">Pink Punch</option>
+                <option value="green">Emerald</option>
+                <option value="orange">Sunset Amber</option>
+                <option value="red">Ruby Flare</option>
+                <option value="blue">Royal Blue</option>
+              </select>
+            </div>
             <button id="lobby-theme-toggle" class="btn btn-ghost btn-sm" style="font-size:0.75rem;">🌗 Toggle Light/Dark Mode</button>
           </div>
         </div>
@@ -414,11 +428,11 @@
       <div class="chat-header">
         <div style="display:flex; align-items:center; gap:8px;">
           <h3>💬 Chat</h3>
-          <button class="btn-icon btn-sm" id="btn-pinned-messages-trigger" title="Pinned Messages" style="width:26px; height:26px; font-size:0.75rem; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); padding:0;">📌</button>
-          <button class="btn-icon btn-sm" id="btn-active-polls-trigger" title="Active Polls" style="width:26px; height:26px; font-size:0.75rem; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); padding:0;">📊</button>
+          <button class="btn-icon btn-sm" id="btn-pinned-messages-trigger" title="Pinned Messages" style="width:26px; height:26px; font-size:0.75rem; padding:0;">📌</button>
+          <button class="btn-icon btn-sm" id="btn-active-polls-trigger" title="Active Polls" style="width:26px; height:26px; font-size:0.75rem; padding:0;">📊</button>
         </div>
         <div style="display:flex; align-items:center; gap:6px;">
-          <input type="text" id="chat-search" placeholder="Search..." style="margin:0; padding:6px 10px; font-size:0.75rem; width:80px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); color:#fff; transition: width 0.2s;">
+          <input type="text" id="chat-search" placeholder="Search..." style="margin:0; padding:6px 10px; font-size:0.75rem; width:80px; border-radius:6px; transition: width 0.2s;">
           <button class="btn-icon" id="btn-close-chat" title="Close chat" style="width:28px; height:28px; border:none; background:transparent;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
           </button>
@@ -528,6 +542,28 @@
         <span class="setting-value" id="noise-threshold-val">12</span>
       </div>
       <div class="setting-item">
+        <label>Soundboard Volume</label>
+        <input type="range" id="setting-soundboard-volume" min="0" max="100" value="60">
+        <span class="setting-value" id="soundboard-volume-val">60%</span>
+      </div>
+      <div class="setting-item">
+        <label>Chat Text Size</label>
+        <select id="setting-chat-size">
+          <option value="small">Small</option>
+          <option value="medium" selected>Medium</option>
+          <option value="large">Large</option>
+        </select>
+      </div>
+      <div class="setting-item">
+        <label>Room Wallpaper</label>
+        <select id="setting-wallpaper">
+          <option value="cosmic" selected>Cosmic Mesh</option>
+          <option value="obsidian">Deep Obsidian</option>
+          <option value="forest">Neon Forest</option>
+          <option value="glass">Classic Glass</option>
+        </select>
+      </div>
+      <div class="setting-item">
         <label>Input Device</label>
         <select id="input-device"></select>
       </div>
@@ -564,6 +600,12 @@
         <label style="display:flex; align-items:center; gap:8px; text-transform:none; cursor:pointer;">
           <input type="checkbox" id="setting-low-bandwidth" style="width:auto; margin:0;">
           <span>Low Bandwidth Mode</span>
+        </label>
+      </div>
+      <div class="setting-item">
+        <label style="display:flex; align-items:center; gap:8px; text-transform:none; cursor:pointer;">
+          <input type="checkbox" id="setting-sound-notifications" checked style="width:auto; margin:0;">
+          <span>Sound Notifications</span>
         </label>
       </div>
     </div>
@@ -703,7 +745,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.34';
+  window.APP_VERSION = '1.0.35';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -736,6 +778,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.34"></script>
+<script src="/app.js?v=1.0.35"></script>
 </body>
 </html>

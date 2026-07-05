@@ -114,6 +114,50 @@
   let lowBandwidthEnabled = false;
   let handRaised = false;
 
+  let soundboardVolume = parseInt(localStorage.getItem('vw_sb_volume') || '60');
+  let chatTextSize = localStorage.getItem('vw_chat_size') || 'medium';
+  let roomWallpaper = localStorage.getItem('vw_wallpaper') || 'cosmic';
+  let soundNotifications = localStorage.getItem('vw_sound_notifications') !== 'false';
+  let myStatusText = localStorage.getItem('vw_status_text') || '';
+  let myAvatarColor = localStorage.getItem('vw_avatar_color') || 'cyan';
+
+  function getAvatarPayload() {
+    if (userAvatar) {
+      return userAvatar;
+    }
+    return `data:image/vw;metadata,${JSON.stringify({ color: myAvatarColor, statusText: myStatusText })}`;
+  }
+
+  function parseAvatarPayload(avatarStr) {
+    if (!avatarStr) return { type: 'initials', color: 'cyan', statusText: '' };
+    if (avatarStr.startsWith('data:image/vw;metadata,')) {
+      try {
+        const data = JSON.parse(avatarStr.substring('data:image/vw;metadata,'.length));
+        return { type: 'initials', color: data.color || 'cyan', statusText: data.statusText || '' };
+      } catch (e) {
+        return { type: 'initials', color: 'cyan', statusText: '' };
+      }
+    }
+    return { type: 'image', url: avatarStr, color: 'cyan', statusText: '' };
+  }
+
+  function getAvatarClass(colorName) {
+    return `avatar-accent-${colorName}`;
+  }
+
+  function updateProfileAvatarColorOrText() {
+    const avatarContainer = $('#profile-avatar');
+    if (avatarContainer) {
+      avatarContainer.classList.remove('avatar-accent-cyan', 'avatar-accent-purple', 'avatar-accent-pink', 'avatar-accent-green', 'avatar-accent-orange', 'avatar-accent-red', 'avatar-accent-blue');
+      if (!userAvatar) {
+        avatarContainer.classList.add(getAvatarClass(myAvatarColor));
+        avatarContainer.style.background = '';
+      } else {
+        avatarContainer.style.background = '';
+      }
+    }
+  }
+
   let visualizerCanvas = null;
   let visualizerCtx = null;
   let visualizerDrawLoop = null;
@@ -213,6 +257,7 @@
       initial.textContent = getInitial(window.userName);
       nameEl.textContent = window.userName;
     }
+    updateProfileAvatarColorOrText();
   }
 
   function handleAvatarUpload(file) {
@@ -550,11 +595,12 @@
     card.dataset.socket = socketId;
     card.dataset.name = name;
 
-    const avatarColor = getAvatarColor(name);
+    const parsed = parseAvatarPayload(avatar);
+    const accentClass = getAvatarClass(parsed.color);
     const initial = getInitial(name);
-    const avatarHtml = avatar
-      ? `<div class="user-avatar" style="background:${avatarColor};"><img src="${escapeHtml(avatar)}" alt=""></div>`
-      : `<div class="user-avatar" style="background:${avatarColor};">${escapeHtml(initial)}</div>`;
+    const avatarHtml = parsed.type === 'image'
+      ? `<div class="user-avatar" style="background:${getAvatarColor(name)};"><img src="${escapeHtml(parsed.url)}" alt=""></div>`
+      : `<div class="user-avatar ${accentClass}">${escapeHtml(initial)}</div>`;
 
     let muteBtnHtml = '';
     const iAmCreator = isCreatorLocal();
@@ -602,6 +648,9 @@
     `;
 
     const handRaisedHtml = handRaisedState ? `<div class="hand-raise-badge">✋</div>` : '';
+    const statusTextHtml = parsed.statusText
+      ? `<div class="status-text-display" title="${escapeHtml(parsed.statusText)}">${escapeHtml(parsed.statusText)}</div>`
+      : '';
 
     card.innerHTML = `
       ${qualityHtml}
@@ -612,6 +661,7 @@
         <div class="status-dot" style="background:${s.color};"></div>
         ${muted ? 'Muted' : s.text}
       </div>
+      ${statusTextHtml}
       <div class="user-status-icons">
         ${muted ? '<span class="status-icon" style="color:#ef4444;">Muted</span>' : ''}
         ${isCreator ? '<span class="status-icon admin-badge">Admin</span>' : ''}
@@ -1398,7 +1448,7 @@
     pinnedMessages.forEach(msg => {
       const item = document.createElement('div');
       item.className = 'chat-msg';
-      item.style.border = '1px solid rgba(255,255,255,0.06)';
+      item.style.border = '1px solid var(--border)';
       item.style.padding = '10px';
       item.style.borderRadius = '8px';
 
@@ -1408,7 +1458,7 @@
 
       item.innerHTML = `
         <div style="font-size:0.72rem; color:var(--muted); margin-bottom:4px;"><strong>@${escapeHtml(msg.name)}</strong>:</div>
-        <div style="font-size:0.82rem; color:#f0f4ff;">${escapeHtml(msg.text)}</div>
+        <div style="font-size:0.82rem; color:var(--text);">${escapeHtml(msg.text)}</div>
         ${unpinBtn}
       `;
       list.appendChild(item);
@@ -1452,7 +1502,7 @@
 
       card.innerHTML = `
         <div style="font-size:0.7rem; color:var(--purple); font-weight:700; text-transform:uppercase;">Poll by ${escapeHtml(poll.creator)}</div>
-        <div style="font-size:0.95rem; font-weight:700; color:#fff;">${escapeHtml(poll.question)}</div>
+        <div style="font-size:0.95rem; font-weight:700; color:var(--text);">${escapeHtml(poll.question)}</div>
         <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
           ${optionsHtml}
         </div>
@@ -1787,14 +1837,14 @@
   function detectLinksAndCreatePreview(url) {
     // Simple frontend preview card constructor
     const el = document.createElement('div');
-    el.style.cssText = 'margin-top:8px; padding:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:8px; display:flex; flex-direction:column; gap:4px; max-width:280px;';
+    el.style.cssText = 'margin-top:8px; padding:10px; background:var(--glass); border:1px solid var(--border); border-radius:8px; display:flex; flex-direction:column; gap:4px; max-width:280px;';
 
     let hostname = 'link';
     try { hostname = new URL(url).hostname; } catch(e) {}
 
     el.innerHTML = `
       <div style="font-size:0.65rem; color:var(--cyan); text-transform:uppercase; font-weight:700;">Link Preview</div>
-      <a href="${escapeHtml(url)}" target="_blank" style="font-size:0.8rem; color:#f0f4ff; font-weight:600; text-decoration:none; word-break:break-all;">${escapeHtml(hostname)}</a>
+      <a href="${escapeHtml(url)}" target="_blank" style="font-size:0.8rem; color:var(--text); font-weight:600; text-decoration:none; word-break:break-all;">${escapeHtml(hostname)}</a>
       <div style="font-size:0.7rem; color:var(--muted);">Click to open webpage in your browser.</div>
     `;
     return el;
@@ -2481,7 +2531,7 @@
       switch (data.status) {
         case 'checking':
           updateLabel.textContent = 'Checking for updates...';
-          updateLabel.style.color = '#d1d5db';
+          updateLabel.style.color = 'var(--text)';
           btnCheck.style.display = 'none';
           btnDownload.style.display = 'none';
           btnInstall.style.display = 'none';
@@ -2500,7 +2550,7 @@
           break;
         case 'downloading':
           updateLabel.textContent = 'Downloading update...';
-          updateLabel.style.color = '#d1d5db';
+          updateLabel.style.color = 'var(--text)';
           btnDownload.style.display = 'none';
           progressBar.style.display = 'block';
           progressText.style.display = 'block';
@@ -2518,7 +2568,7 @@
           break;
         case 'up-to-date':
           updateLabel.textContent = `App is up to date (v${window.APP_VERSION || '1.0.2'})`;
-          updateLabel.style.color = '#6b7280';
+          updateLabel.style.color = 'var(--muted)';
           btnCheck.style.display = 'inline-flex';
           btnDownload.style.display = 'none';
           btnInstall.style.display = 'none';
