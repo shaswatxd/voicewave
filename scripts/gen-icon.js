@@ -171,28 +171,55 @@ async function generate() {
 
   console.log('Generating icons...');
 
-  await sharp(Buffer.from(SVG)).resize(256, 256).png().toFile(path.join(ASSETS, 'icon.png'));
-  console.log('✓ icon.png (256x256)');
+  // ── Use existing source PNG if available, else fall back to SVG ──
+  const sourcePng = path.join(ASSETS, 'icon-source.png');
+  const pubIcon   = path.join(PUB, 'icon.png');
+  let src;
 
-  await sharp(Buffer.from(SVG)).resize(16, 16).png().toFile(path.join(ASSETS, 'tray.png'));
-  console.log('✓ tray.png (16x16)');
+  if (fs.existsSync(sourcePng)) {
+    src = sharp(sourcePng);
+    console.log('→ Using icon-source.png as master');
+  } else if (fs.existsSync(pubIcon)) {
+    src = sharp(pubIcon);
+    console.log('→ Using public/icon.png as master');
+  } else {
+    src = sharp(Buffer.from(SVG));
+    console.log('→ Falling back to SVG');
+  }
 
-  await sharp(Buffer.from(SVG)).resize(512, 512).png().toFile(path.join(PUB, 'icon.png'));
-  console.log('✓ icon.png (512x512)');
+  const toBuffer = async (size) =>
+    (fs.existsSync(sourcePng) ? sharp(sourcePng) : fs.existsSync(pubIcon) ? sharp(pubIcon) : sharp(Buffer.from(SVG)))
+      .resize(size, size)
+      .png()
+      .toBuffer();
 
-  await sharp(Buffer.from(SVG)).resize(192, 192).png().toFile(path.join(PUB, 'icon-192.png'));
-  console.log('✓ icon-192.png (192x192)');
+  const toFile = async (size, dest) => {
+    const buf = await toBuffer(size);
+    fs.writeFileSync(dest, buf);
+  };
 
-  await sharp(Buffer.from(SVG)).resize(512, 512).png().toFile(path.join(PUB, 'icon-512.png'));
-  console.log('✓ icon-512.png (512x512)');
+  await toFile(256, path.join(ASSETS, 'icon.png'));
+  console.log('✓ icon.png generated (256x256)');
 
-  await sharp(Buffer.from(SVG)).resize(512, 512).png().toFile(path.join(PUB, 'icon-maskable.png'));
-  console.log('✓ icon-maskable.png (512x512)');
+  await toFile(16, path.join(ASSETS, 'tray.png'));
+  console.log('✓ tray.png generated (16x16)');
+
+  await toFile(512, path.join(PUB, 'icon.png'));
+  console.log('✓ public/icon.png generated (512x512)');
+
+  await toFile(192, path.join(PUB, 'icon-192.png'));
+  console.log('✓ public/icon-192.png generated (192x192)');
+
+  await toFile(512, path.join(PUB, 'icon-512.png'));
+  console.log('✓ public/icon-512.png generated (512x512)');
+
+  await toFile(512, path.join(PUB, 'icon-maskable.png'));
+  console.log('✓ public/icon-maskable.png generated (512x512)');
 
   const sizes = [16, 24, 32, 48, 64, 128, 256];
   const bufs = [];
   for (const s of sizes) {
-    bufs.push({ size: s, buf: await sharp(Buffer.from(SVG)).resize(s, s).png().toBuffer() });
+    bufs.push({ size: s, buf: await toBuffer(s) });
   }
 
   const numImages = bufs.length;
@@ -216,7 +243,7 @@ async function generate() {
   }
 
   fs.writeFileSync(path.join(ASSETS, 'icon.ico'), Buffer.concat([header, ...bufs.map(b => b.buf)]));
-  console.log('✓ icon.ico (7 sizes)');
+  console.log('✓ icon.ico generated (7 sizes)');
 
   console.log('\nAll icons generated!');
 }
