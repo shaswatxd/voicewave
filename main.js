@@ -313,7 +313,7 @@ function createTray() {
   const iconPath = path.join(__dirname, 'assets', 'tray.png');
   let trayIcon;
   try {
-    trayIcon = nativeImage.createFromPath(iconPath);
+    trayIcon = nativeImage.createFromPath(iconPath).resize({ width: 32, height: 32 });
   } catch {
     trayIcon = nativeImage.createEmpty();
   }
