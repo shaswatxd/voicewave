@@ -41,11 +41,8 @@ function getLoadingHTML() {
   }
   .container { text-align: center; animation: fadeIn 0.5s ease; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-  .logo {
+  .logo-svg {
     width: 80px; height: 80px; margin: 0 auto 24px;
-    background: linear-gradient(135deg, #22d3ee, #a855f7);
-    border-radius: 20px; display: flex; align-items: center; justify-content: center;
-    font-size: 36px; font-weight: bold; color: #000;
     animation: pulse 2s ease-in-out infinite;
   }
   @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
@@ -63,7 +60,63 @@ function getLoadingHTML() {
   .error-msg { display: none; color: #f87171; margin-top: 16px; font-size: 13px; }
 </style></head>
 <body><div class="container">
-  <div class="logo">W</div>
+  <svg class="logo-svg" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#0c1220"/>
+        <stop offset="50%" style="stop-color:#060a12"/>
+        <stop offset="100%" style="stop-color:#020408"/>
+      </linearGradient>
+      <linearGradient id="border-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#22d3ee; stop-opacity:0.8"/>
+        <stop offset="30%" style="stop-color:#a855f7; stop-opacity:0.3"/>
+        <stop offset="70%" style="stop-color:#ec4899; stop-opacity:0.1"/>
+        <stop offset="100%" style="stop-color:#22d3ee; stop-opacity:0.5"/>
+      </linearGradient>
+      <linearGradient id="wave-cyan" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" style="stop-color:#06b6d4; stop-opacity:0.8"/>
+        <stop offset="50%" style="stop-color:#22d3ee; stop-opacity:1"/>
+        <stop offset="100%" style="stop-color:#0891b2; stop-opacity:0.8"/>
+      </linearGradient>
+      <linearGradient id="wave-purple" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" style="stop-color:#7c3aed; stop-opacity:0.7"/>
+        <stop offset="50%" style="stop-color:#a855f7; stop-opacity:1"/>
+        <stop offset="100%" style="stop-color:#c084fc; stop-opacity:0.7"/>
+      </linearGradient>
+      <linearGradient id="wave-pink" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" style="stop-color:#db2777; stop-opacity:0.6"/>
+        <stop offset="50%" style="stop-color:#ec4899; stop-opacity:0.9"/>
+        <stop offset="100%" style="stop-color:#f472b6; stop-opacity:0.6"/>
+      </linearGradient>
+      <filter id="glow-filter" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur"/>
+        <feMerge>
+          <feMergeNode in="blur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+      <radialGradient id="center-glow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" style="stop-color:#22d3ee; stop-opacity:0.15"/>
+        <stop offset="100%" style="stop-color:#a855f7; stop-opacity:0"/>
+      </radialGradient>
+    </defs>
+    <rect x="4" y="4" width="504" height="504" rx="120" fill="url(#bg-grad)"/>
+    <rect x="5" y="5" width="502" height="502" rx="119" fill="none" stroke="url(#border-grad)" stroke-width="3"/>
+    <circle cx="256" cy="256" r="180" fill="url(#center-glow)" />
+    <g filter="url(#glow-filter)">
+      <rect x="112" y="216" width="16" height="80" rx="8" fill="url(#wave-cyan)" />
+      <rect x="146" y="171" width="16" height="170" rx="8" fill="url(#wave-purple)" />
+      <rect x="180" y="201" width="16" height="110" rx="8" fill="url(#wave-pink)" />
+      <rect x="214" y="226" width="16" height="60" rx="8" fill="url(#wave-cyan)" opacity="0.9" />
+      <rect x="248" y="126" width="16" height="260" rx="8" fill="url(#wave-cyan)" />
+      <rect x="282" y="226" width="16" height="60" rx="8" fill="url(#wave-cyan)" opacity="0.9" />
+      <rect x="316" y="201" width="16" height="110" rx="8" fill="url(#wave-pink)" />
+      <rect x="350" y="171" width="16" height="170" rx="8" fill="url(#wave-purple)" />
+      <rect x="384" y="216" width="16" height="80" rx="8" fill="url(#wave-cyan)" />
+    </g>
+    <circle cx="256" cy="256" r="210" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="12 24" opacity="0.25" />
+    <circle cx="256" cy="256" r="225" fill="none" stroke="#a855f7" stroke-width="1" stroke-dasharray="6 12" opacity="0.15" />
+  </svg>
   <h1>VoiceWave</h1>
   <p class="status" id="status">Connecting to server...</p>
   <div class="spinner" id="spinner"></div>

@@ -444,16 +444,100 @@ async function main() {
     const sharp = require('sharp');
 
     // Generate icon.png (256x256)
-    const iconSvg = `<svg width="256" height="256" xmlns="http://www.w3.org/2000/svg">
+    const iconSvg = `<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:#22d3ee"/>
-          <stop offset="100%" style="stop-color:#a855f7"/>
+        <!-- Background Gradient: Deep Space Obsidian -->
+        <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#0c1220"/>
+          <stop offset="50%" style="stop-color:#060a12"/>
+          <stop offset="100%" style="stop-color:#020408"/>
         </linearGradient>
+
+        <!-- Glossy Border Gradient -->
+        <linearGradient id="border-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#22d3ee; stop-opacity:0.8"/>
+          <stop offset="30%" style="stop-color:#a855f7; stop-opacity:0.3"/>
+          <stop offset="70%" style="stop-color:#ec4899; stop-opacity:0.1"/>
+          <stop offset="100%" style="stop-color:#22d3ee; stop-opacity:0.5"/>
+        </linearGradient>
+
+        <!-- Wave Gradients -->
+        <linearGradient id="wave-cyan" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" style="stop-color:#06b6d4; stop-opacity:0.8"/>
+          <stop offset="50%" style="stop-color:#22d3ee; stop-opacity:1"/>
+          <stop offset="100%" style="stop-color:#0891b2; stop-opacity:0.8"/>
+        </linearGradient>
+
+        <linearGradient id="wave-purple" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" style="stop-color:#7c3aed; stop-opacity:0.7"/>
+          <stop offset="50%" style="stop-color:#a855f7; stop-opacity:1"/>
+          <stop offset="100%" style="stop-color:#c084fc; stop-opacity:0.7"/>
+        </linearGradient>
+
+        <linearGradient id="wave-pink" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" style="stop-color:#db2777; stop-opacity:0.6"/>
+          <stop offset="50%" style="stop-color:#ec4899; stop-opacity:0.9"/>
+          <stop offset="100%" style="stop-color:#f472b6; stop-opacity:0.6"/>
+        </linearGradient>
+
+        <!-- Glow Filter -->
+        <filter id="glow-filter" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur"/>
+          <feMerge>
+            <feMergeNode in="blur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+        
+        <!-- Background Glow for Logo -->
+        <radialGradient id="center-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" style="stop-color:#22d3ee; stop-opacity:0.15"/>
+          <stop offset="100%" style="stop-color:#a855f7; stop-opacity:0"/>
+        </radialGradient>
       </defs>
-      <rect width="256" height="256" rx="48" fill="url(#g)"/>
-      <text x="128" y="145" font-size="120" fill="#000" text-anchor="middle" font-family="Arial" font-weight="bold">W</text>
-      <text x="128" y="200" font-size="32" fill="#000" text-anchor="middle" font-family="Arial" font-weight="600" opacity="0.7">VoiceWave</text>
+
+      <!-- App Icon Base -->
+      <rect x="4" y="4" width="504" height="504" rx="120" fill="url(#bg-grad)"/>
+      
+      <!-- Sleek Glowing Inner Border -->
+      <rect x="5" y="5" width="502" height="502" rx="119" fill="none" stroke="url(#border-grad)" stroke-width="3"/>
+
+      <!-- Ambient Center Glow -->
+      <circle cx="256" cy="256" r="180" fill="url(#center-glow)" />
+
+      <!-- A dynamic central soundwave structure forming a W shape -->
+      <g filter="url(#glow-filter)">
+        <!-- Bar -4: Height = 80 -->
+        <rect x="112" y="216" width="16" height="80" rx="8" fill="url(#wave-cyan)" />
+        
+        <!-- Bar -3: Height = 170 -->
+        <rect x="146" y="171" width="16" height="170" rx="8" fill="url(#wave-purple)" />
+        
+        <!-- Bar -2: Height = 110 -->
+        <rect x="180" y="201" width="16" height="110" rx="8" fill="url(#wave-pink)" />
+        
+        <!-- Bar -1: Height = 60 -->
+        <rect x="214" y="226" width="16" height="60" rx="8" fill="url(#wave-cyan)" opacity="0.9" />
+        
+        <!-- Bar 0 (Center Peak): Height = 260 -->
+        <rect x="248" y="126" width="16" height="260" rx="8" fill="url(#wave-cyan)" />
+        
+        <!-- Bar 1: Height = 60 -->
+        <rect x="282" y="226" width="16" height="60" rx="8" fill="url(#wave-cyan)" opacity="0.9" />
+        
+        <!-- Bar 2: Height = 110 -->
+        <rect x="316" y="201" width="16" height="110" rx="8" fill="url(#wave-pink)" />
+        
+        <!-- Bar 3: Height = 170 -->
+        <rect x="350" y="171" width="16" height="170" rx="8" fill="url(#wave-purple)" />
+        
+        <!-- Bar 4: Height = 80 -->
+        <rect x="384" y="216" width="16" height="80" rx="8" fill="url(#wave-cyan)" />
+      </g>
+
+      <!-- Concentric Rings -->
+      <circle cx="256" cy="256" r="210" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="12 24" opacity="0.25" />
+      <circle cx="256" cy="256" r="225" fill="none" stroke="#a855f7" stroke-width="1" stroke-dasharray="6 12" opacity="0.15" />
     </svg>`;
 
     await sharp(Buffer.from(iconSvg)).resize(256, 256).png().toFile(path.join(assetsDir, 'icon.png'));
@@ -466,6 +550,18 @@ async function main() {
     // Generate public/icon.png (512x512 for PWA)
     await sharp(Buffer.from(iconSvg)).resize(512, 512).png().toFile(path.join(PUB, 'icon.png'));
     ok('public/icon.png generated (512x512)');
+
+    // Generate public/icon-192.png (192x192)
+    await sharp(Buffer.from(iconSvg)).resize(192, 192).png().toFile(path.join(PUB, 'icon-192.png'));
+    ok('public/icon-192.png generated (192x192)');
+
+    // Generate public/icon-512.png (512x512)
+    await sharp(Buffer.from(iconSvg)).resize(512, 512).png().toFile(path.join(PUB, 'icon-512.png'));
+    ok('public/icon-512.png generated (512x512)');
+
+    // Generate public/icon-maskable.png (512x512)
+    await sharp(Buffer.from(iconSvg)).resize(512, 512).png().toFile(path.join(PUB, 'icon-maskable.png'));
+    ok('public/icon-maskable.png generated (512x512)');
 
     // Generate ico (multiple sizes for Windows)
     const sizes = [16, 24, 32, 48, 64, 128, 256];
