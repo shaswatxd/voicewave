@@ -557,7 +557,33 @@
       card.appendChild(audio);
     }
     audio.srcObject = stream;
+
+    // Set initial volume based on the volume slider value in the UI
+    const slider = card.querySelector('[data-peer-volume]');
+    if (slider) {
+      audio.volume = slider.value / 100;
+    } else {
+      audio.volume = 0.8; // default to 80%
+    }
     if (isDeafened) audio.volume = 0;
+
+    // Apply the currently selected output device (speaker)
+    const currentSinkId = $('#output-device')?.value;
+    if (currentSinkId && audio.setSinkId) {
+      audio.setSinkId(currentSinkId).catch(err => console.warn('setSinkId error:', err));
+    }
+
+    // Explicitly play and handle autoplay policies
+    audio.play().catch(err => {
+      console.warn('[VoiceWave] Autoplay blocked for user audio:', err);
+      // Wait for a user click anywhere to resume/play audio
+      const resumeAudio = () => {
+        audio.play().then(() => {
+          document.removeEventListener('click', resumeAudio);
+        }).catch(e => console.error('[VoiceWave] Play failed after click:', e));
+      };
+      document.addEventListener('click', resumeAudio);
+    });
   }
 
   function isCreatorLocal() {
@@ -1344,6 +1370,18 @@
     socket.on('kicked', () => {
       toast('You were kicked from the room', 'error');
       leaveRoom();
+    });
+
+    socket.on('offer', async (data) => {
+      await handleOffer(data.from, data.offer);
+    });
+
+    socket.on('answer', async (data) => {
+      await handleAnswer(data.from, data.answer);
+    });
+
+    socket.on('ice-candidate', async (data) => {
+      await handleIceCandidate(data.from, data.candidate);
     });
   }
 
