@@ -21,7 +21,7 @@ let isMuted = false;
 let isDeafened = false;
 let inRoom = false;
 
-const SERVER_URL = 'https://voicewave-production-289f.up.railway.app';
+const SERVER_URL = 'https://voicewave-7ozn.onrender.com';
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 3000;
 
