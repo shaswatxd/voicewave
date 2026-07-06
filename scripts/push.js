@@ -54,6 +54,10 @@ function patchVersion(filePath, pattern, replacement) {
 }
 
 async function main() {
+  // Delete invalid tokens from process.env so gh CLI uses keyring credentials
+  delete process.env.GH_TOKEN;
+  delete process.env.GITHUB_TOKEN;
+
   console.log('\n\x1b[1m\x1b[35m╔══════════════════════════════════╗');
   console.log('║      VoiceWave Publish Script    ║');
   console.log('╚══════════════════════════════════╝\x1b[0m\n');
@@ -624,6 +628,8 @@ async function main() {
   // ── STEP 15: GitHub Release ──
   log('Step 15: Creating GitHub release...');
   const nulRedirect = process.platform === 'win32' ? '2>nul' : '2>/dev/null';
+  run(`git tag -d v${VERSION} ${nulRedirect}`);
+  run(`git push --delete origin v${VERSION} ${nulRedirect}`);
   run(`gh release delete v${VERSION} -y ${nulRedirect}`);
   const installerPath = path.join(DIST, `VoiceWave-${VERSION}-Setup.exe`);
   const blockmapPath = path.join(DIST, `VoiceWave-${VERSION}-Setup.exe.blockmap`);
@@ -638,6 +644,17 @@ async function main() {
   } else {
     err('Installer not found, skipping GitHub release');
   }
+
+  // ── STEP 16: Post-Publish Cleanup ──
+  log('Step 16: Cleaning up workspace...');
+  deleteFolder(DIST);
+  const roomsFile = path.join(ROOT, 'rooms.json');
+  if (fs.existsSync(roomsFile)) {
+    log('Deleting rooms.json...');
+    fs.unlinkSync(roomsFile);
+    ok('rooms.json deleted');
+  }
+  ok('Workspace clean');
 
   // ── DONE ──
   console.log('\n\x1b[1m\x1b[32m╔══════════════════════════════════╗');
