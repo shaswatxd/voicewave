@@ -8,11 +8,11 @@
     { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
   ];
 
-  const SVG_CROWN = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z"/><path d="M5 20h14"/></svg>`;
-  const SVG_KICK = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-  const SVG_AUDIO = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
-  const SVG_MUTE = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`;
-  const SVG_WHISPER = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
+  const SVG_CROWN = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z"/><path d="M5 20h14"/></svg>`;
+  const SVG_KICK = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+  const SVG_AUDIO = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
+  const SVG_MUTE = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`;
+  const SVG_WHISPER = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
 
   const AVATAR_COLORS = [
     'linear-gradient(135deg,#22d3ee,#06b6d4)',
@@ -196,7 +196,7 @@
   }
 
   function generateRoomId() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ23456789'; // Exclude '0' and '1' to avoid visual confusion
     let result = '';
     for (let i = 0; i < 6; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
     return result;
@@ -2232,7 +2232,7 @@
 
     $('#btn-join').addEventListener('click', () => {
       const name = $('#join-name').value.trim();
-      const code = $('#join-code').value.trim().toUpperCase();
+      let code = $('#join-code').value.trim().toUpperCase().replace(/0/g, 'O').replace(/1/g, 'I');
       const password = $('#join-password').value;
       if (!name) return toast('Enter your name', 'error');
       if (!code) return toast('Enter room code', 'error');
@@ -2250,7 +2250,7 @@
 
     $('#modal-submit').addEventListener('click', () => {
       const password = $('#modal-password').value;
-      const code = $('#join-code').value.trim().toUpperCase();
+      let code = $('#join-code').value.trim().toUpperCase().replace(/0/g, 'O').replace(/1/g, 'I');
       window._pendingJoin = { roomId: code, userName: window.userName, muted: false, joinOnly: true, password, avatar: getAvatarPayload() };
       if (socket && socket.connected) {
         socket.emit('join-room', { roomId: code, userName: window.userName, muted: false, joinOnly: true, password, avatar: getAvatarPayload() });
@@ -2617,9 +2617,10 @@
     }
 
     const urlParams = new URLSearchParams(window.location.search);
-    const roomParam = urlParams.get('room');
+    let roomParam = urlParams.get('room');
     const passParam = urlParams.get('password');
     if (roomParam) {
+      roomParam = roomParam.trim().toUpperCase().replace(/0/g, 'O').replace(/1/g, 'I');
       $('#join-code').value = roomParam;
       if (passParam) {
         $('#password-group').style.display = 'block';
