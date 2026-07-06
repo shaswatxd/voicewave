@@ -643,7 +643,7 @@
       const muteSymbol = (muted && forceMuted) ? '🔇' : '🔊';
 
       muteBtnHtml = `
-        <div class="user-actions" style="opacity: 0; display:flex; gap:4px;">
+        <div class="user-actions" style="display:flex; gap:4px;">
           ${banBtnHtml}
           ${hostBtnHtml}
           ${modBtnHtml}
@@ -653,7 +653,7 @@
       `;
     } else if (!isLocal) {
       muteBtnHtml = `
-        <div class="user-actions" style="opacity: 0;">
+        <div class="user-actions">
           <div class="user-mute-btn" data-whisper="${socketId}" title="Whisper Private DM">💬</div>
         </div>
       `;
