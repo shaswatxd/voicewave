@@ -253,9 +253,9 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 💬 Chat messages with history & whispers
+  // 💬 Chat messages with history
   socket.on('chat-message', (data) => {
-    const { roomId, whisperTo } = data;
+    const { roomId } = data;
     const room = rooms.get(roomId);
     if (!room) return;
 
@@ -275,20 +275,11 @@ io.on('connection', (socket) => {
       timestamp: Date.now()
     };
 
-    if (whisperTo) {
-      // Whisper (Private DM)
-      const recipient = io.sockets.sockets.get(whisperTo);
-      if (recipient) {
-        recipient.emit('chat-message', { ...messagePayload, isWhisper: true, toName: recipient.userName });
-        socket.emit('chat-message', { ...messagePayload, isWhisper: true, toName: recipient.userName });
-      }
-    } else {
-      // Public chat: push to history
-      room.history.push(messagePayload);
-      if (room.history.length > 50) room.history.shift();
-      io.to(roomId).emit('chat-message', messagePayload);
-      saveRoomsToDisk();
-    }
+    // Public chat: push to history
+    room.history.push(messagePayload);
+    if (room.history.length > 50) room.history.shift();
+    io.to(roomId).emit('chat-message', messagePayload);
+    saveRoomsToDisk();
   });
 
   // Delete message

@@ -12,7 +12,6 @@
   const SVG_KICK = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
   const SVG_AUDIO = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
   const SVG_MUTE = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`;
-  const SVG_WHISPER = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
 
   const AVATAR_COLORS = [
     'linear-gradient(135deg,#22d3ee,#06b6d4)',
@@ -113,7 +112,6 @@
   // ── NEW STATE VARIABLES ──
   let localTheme = localStorage.getItem('vw_theme') || 'dark';
   let replyingTo = null; // { msgId, name, text }
-  let whispersTarget = null; // { socketId, name }
   let pttEnabled = false;
   let pttKey = 'Space';
   let pttKeyPressed = false;
@@ -653,11 +651,7 @@
         </div>
       `;
     } else if (!isLocal) {
-      muteBtnHtml = `
-        <div class="user-actions">
-          <button class="action-btn" data-whisper="${socketId}" title="Whisper Private DM">${SVG_WHISPER}</button>
-        </div>
-      `;
+      muteBtnHtml = '';
     }
 
     const statusMap = {
@@ -1770,10 +1764,7 @@
       cancelReply();
     }
 
-    // Attach whisper tag if DM is active
-    if (whispersTarget) {
-      msgData.whisperTo = whispersTarget.socketId;
-    }
+
 
     if (pendingFile) {
       const isVideo = pendingFile.type?.startsWith('video/');
@@ -2469,21 +2460,6 @@
         }
       }
 
-      // 6. Whisper Trigger on User Card
-      const whisperBtn = e.target.closest('[data-whisper]');
-      if (whisperBtn) {
-        const targetId = whisperBtn.dataset.whisper;
-        const name = $(`[data-socket="${targetId}"]`)?.dataset.name || 'user';
-        whispersTarget = { socketId: targetId, name };
-
-        // Show indicator in Chat Panel
-        if (!chatOpen) toggleChat();
-        const input = $('#chat-input');
-        input.value = '';
-        input.placeholder = `Whisper to @${name}...`;
-        input.focus();
-        toast(`Whispering to ${name}`, 'info');
-      }
 
       // 7. Message Action: Delete Message
       const actDel = e.target.closest('[data-act-del]');
