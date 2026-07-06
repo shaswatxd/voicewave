@@ -16,7 +16,7 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 const MAX_USERS = 30;
-const WARN_USERS = 15;
+const WARN_USERS = 20;
 const ROOMS_FILE = path.join(__dirname, 'rooms.json');
 
 const rooms = new Map();
@@ -417,39 +417,14 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('peer-soundboard-play', { socketId: socket.id, soundId });
   });
 
-  // 🛡️ Admin & Moderation Controls
+  // 🛡️ Admin & Moderation Controls (Creator Only)
   socket.on('toggle-lock', ({ roomId, locked }) => {
     const room = rooms.get(roomId);
     if (!room) return;
     const isCreator = room.creator === socket.id;
-    const isMod = room.moderators.includes(socket.userName);
-    if (isCreator || isMod) {
+    if (isCreator) {
       room.locked = locked;
       io.to(roomId).emit('room-lock-changed', { locked });
-      saveRoomsToDisk();
-    }
-  });
-
-  socket.on('ban-user', ({ roomId, targetId }) => {
-    const room = rooms.get(roomId);
-    if (!room) return;
-    const isCreator = room.creator === socket.id;
-    const isMod = room.moderators.includes(socket.userName);
-    if ((isCreator || isMod) && room.users.has(targetId)) {
-      const targetUser = room.users.get(targetId);
-      const targetSocket = io.sockets.sockets.get(targetId);
-      const targetIp = targetSocket ? (targetSocket.handshake.headers['x-forwarded-for'] || targetSocket.handshake.address) : '';
-
-      room.banned.push({ name: targetUser.name, ip: targetIp });
-      io.to(roomId).emit('user-banned-notification', { name: targetUser.name });
-
-      if (targetSocket) {
-        targetSocket.emit('kicked-banned', { roomId, banned: true });
-        targetSocket.leave(roomId);
-        targetSocket.roomId = null;
-      }
-      room.users.delete(targetId);
-      io.to(roomId).emit('peer-left', { socketId: targetId });
       saveRoomsToDisk();
     }
   });
@@ -459,20 +434,6 @@ io.on('connection', (socket) => {
     if (room && room.creator === socket.id) {
       room.permissions[permission] = value;
       io.to(roomId).emit('permissions-updated', { permissions: room.permissions });
-      saveRoomsToDisk();
-    }
-  });
-
-  socket.on('toggle-moderator', ({ roomId, targetName, value }) => {
-    const room = rooms.get(roomId);
-    if (room && room.creator === socket.id) {
-      const index = room.moderators.indexOf(targetName);
-      if (value && index === -1) {
-        room.moderators.push(targetName);
-      } else if (!value && index > -1) {
-        room.moderators.splice(index, 1);
-      }
-      io.to(roomId).emit('moderators-updated', { moderators: room.moderators });
       saveRoomsToDisk();
     }
   });
@@ -490,8 +451,7 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (!room) return;
     const isCreator = room.creator === socket.id;
-    const isMod = room.moderators.includes(socket.userName);
-    if ((isCreator || isMod) && room.users.has(targetId)) {
+    if (isCreator && room.users.has(targetId)) {
       io.to(targetId).emit('kicked', { roomId });
       const targetSocket = io.sockets.sockets.get(targetId);
       if (targetSocket) {
@@ -507,8 +467,7 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (!room) return;
     const isCreator = room.creator === socket.id;
-    const isMod = room.moderators.includes(socket.userName);
-    if ((isCreator || isMod) && room.users.has(targetId)) {
+    if (isCreator && room.users.has(targetId)) {
       const user = room.users.get(targetId);
       user.muted = true;
       user.forceMuted = true;
@@ -520,8 +479,7 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (!room) return;
     const isCreator = room.creator === socket.id;
-    const isMod = room.moderators.includes(socket.userName);
-    if ((isCreator || isMod) && room.users.has(targetId)) {
+    if (isCreator && room.users.has(targetId)) {
       const user = room.users.get(targetId);
       if (!user.forceMuted) return;
       user.muted = false;

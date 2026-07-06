@@ -8,6 +8,12 @@
     { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
   ];
 
+  const SVG_CROWN = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z"/><path d="M5 20h14"/></svg>`;
+  const SVG_KICK = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+  const SVG_AUDIO = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
+  const SVG_MUTE = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`;
+  const SVG_WHISPER = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
+
   const AVATAR_COLORS = [
     'linear-gradient(135deg,#22d3ee,#06b6d4)',
     'linear-gradient(135deg,#a855f7,#7c3aed)',
@@ -300,12 +306,12 @@
       }
       const constraints = {
         audio: {
-          echoCancellation: echoCancellationEnabled,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 48000,
-          channelCount: 1,
-          sampleSize: 16
+          echoCancellation: { ideal: echoCancellationEnabled },
+          noiseSuppression: { ideal: true },
+          autoGainControl: { ideal: true },
+          sampleRate: { ideal: 48000 },
+          sampleSize: { ideal: 24 },
+          channelCount: { ideal: 1 }
         }
       };
       if (deviceId) {
@@ -445,7 +451,7 @@
         if (lowBandwidthEnabled) {
           params.encodings[0].maxBitrate = 16000; // limit to 16 kbps
         } else {
-          delete params.encodings[0].maxBitrate;
+          params.encodings[0].maxBitrate = 128000; // 128 kbps (crystal clear HD Opus)
         }
         sender.setParameters(params).catch(err => console.warn('Bitrate limit error:', err));
       }
@@ -632,29 +638,24 @@
 
     let muteBtnHtml = '';
     const iAmCreator = isCreatorLocal();
-    const iAmMod = isModLocal();
-    const isAdmin = iAmCreator || iAmMod;
+    const isAdmin = iAmCreator;
 
     if (!isLocal && isAdmin) {
-      const banBtnHtml = `<div class="user-kick" data-ban="${socketId}" title="Ban user" style="background:rgba(239,68,68,0.15); color:#ef4444; border-color:rgba(239,68,68,0.3); margin-right:4px;">🔨</div>`;
-      const hostBtnHtml = iAmCreator ? `<div class="user-kick" data-transfer="${socketId}" title="Transfer Host" style="background:rgba(34,211,238,0.15); color:#22d3ee; border-color:rgba(34,211,238,0.3); margin-right:4px;">👑</div>` : '';
-      const modBtnHtml = iAmCreator ? `<div class="user-kick" data-mod-toggle="${socketId}" title="${isMod ? 'Demote Moderator' : 'Promote Moderator'}" style="background:rgba(168,85,247,0.15); color:#a855f7; border-color:rgba(168,85,247,0.3); margin-right:4px;">🛡️</div>` : '';
+      const hostBtnHtml = `<button class="action-btn" data-transfer="${socketId}" title="Transfer Host" style="margin-right:4px;">${SVG_CROWN}</button>`;
       const muteAction = (muted && forceMuted) ? 'Unmute' : 'Mute';
-      const muteSymbol = (muted && forceMuted) ? '🔇' : '🔊';
+      const muteSymbol = (muted && forceMuted) ? SVG_MUTE : SVG_AUDIO;
 
       muteBtnHtml = `
         <div class="user-actions" style="display:flex; gap:4px;">
-          ${banBtnHtml}
           ${hostBtnHtml}
-          ${modBtnHtml}
-          <div class="user-kick" data-kick="${socketId}" title="Kick user">✕</div>
-          <div class="user-mute-btn" data-force-mute="${socketId}" title="${muteAction} user">${muteSymbol}</div>
+          <button class="action-btn btn-kick" data-kick="${socketId}" title="Kick user" style="margin-right:4px;">${SVG_KICK}</button>
+          <button class="action-btn btn-mute" data-force-mute="${socketId}" title="${muteAction} user">${muteSymbol}</button>
         </div>
       `;
     } else if (!isLocal) {
       muteBtnHtml = `
         <div class="user-actions">
-          <div class="user-mute-btn" data-whisper="${socketId}" title="Whisper Private DM">💬</div>
+          <button class="action-btn" data-whisper="${socketId}" title="Whisper Private DM">${SVG_WHISPER}</button>
         </div>
       `;
     }
@@ -808,7 +809,7 @@
     if (muteBtn) {
       const isForceMutedNow = peerForceMuted[socketId];
       muteBtn.title = isForceMutedNow ? 'Unmute user' : 'Mute user';
-      muteBtn.textContent = isForceMutedNow ? '🔇' : '🔊';
+      muteBtn.innerHTML = isForceMutedNow ? SVG_MUTE : SVG_AUDIO;
     }
   }
 
@@ -2447,16 +2448,6 @@
         $('#kick-modal').classList.add('open');
       }
 
-      // 2. Ban User
-      const banBtn = e.target.closest('[data-ban]');
-      if (banBtn) {
-        const targetId = banBtn.dataset.ban;
-        const name = $(`[data-socket="${targetId}"]`)?.dataset.name || 'user';
-        if (confirm(`Ban ${name} permanently from this room?`)) {
-          socket.emit('ban-user', { roomId, targetId });
-        }
-      }
-
       // 3. Transfer Host
       const transBtn = e.target.closest('[data-transfer]');
       if (transBtn) {
@@ -2465,15 +2456,6 @@
         if (confirm(`Transfer room ownership to ${name}?`)) {
           socket.emit('transfer-creator', { roomId, targetId });
         }
-      }
-
-      // 4. Toggle Moderator
-      const modBtn = e.target.closest('[data-mod-toggle]');
-      if (modBtn) {
-        const targetId = modBtn.dataset.modToggle;
-        const name = $(`[data-socket="${targetId}"]`)?.dataset.name || 'user';
-        const isCurrentlyMod = roomModerators.includes(name);
-        socket.emit('toggle-moderator', { roomId, targetName: name, value: !isCurrentlyMod });
       }
 
       // 5. Force Mute
