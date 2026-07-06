@@ -802,6 +802,14 @@
         mi.remove();
       }
     }
+
+    // Dynamic admin mute button update
+    const muteBtn = card.querySelector('[data-force-mute]');
+    if (muteBtn) {
+      const isForceMutedNow = peerForceMuted[socketId];
+      muteBtn.title = isForceMutedNow ? 'Unmute user' : 'Mute user';
+      muteBtn.textContent = isForceMutedNow ? '🔇' : '🔊';
+    }
   }
 
   function startSpeakingPoll() {
@@ -2472,13 +2480,7 @@
       const forceMuteBtn = e.target.closest('[data-force-mute]');
       if (forceMuteBtn) {
         const targetId = forceMuteBtn.dataset.forceMute;
-        const card = $(`[data-socket="${targetId}"]`);
-        const isMutedState = card?.classList.contains('muted');
-        if (isMutedState) {
-          if (!peerForceMuted[targetId]) {
-            toast('User muted themselves — cannot unmute', 'error');
-            return;
-          }
+        if (peerForceMuted[targetId]) {
           socket.emit('force-unmute', { roomId, targetId });
         } else {
           socket.emit('force-mute', { roomId, targetId });
