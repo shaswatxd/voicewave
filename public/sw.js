@@ -1,4 +1,4 @@
-const CACHE_NAME = 'voicewave-v1.0.63';
+const CACHE_NAME = 'voicewave-v1.0.65';
 const ASSETS = [
   '/',
   '/app',
@@ -26,19 +26,22 @@ self.addEventListener('activate', (e) => {
   self.clients.claim();
 });
 
+// Network-first, cache as offline fallback only — NOT cache-first. This app
+// ships frequent fixes; cache-first meant users could keep seeing broken
+// old code for a long time after every deploy, with no way to tell they
+// were on a stale version (this bit us directly: a "Connection failed"
+// message from a prior build kept showing up long after the real fix had
+// already shipped and was verified working server-side).
 self.addEventListener('fetch', (e) => {
   if (e.request.url.includes('/socket.io/')) return;
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then((cached) => {
-      const fetched = fetch(e.request).then((res) => {
-        if (res && res.status === 200) {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
-        }
-        return res;
-      }).catch(() => cached);
-      return cached || fetched;
-    })
+    fetch(e.request).then((res) => {
+      if (res && res.status === 200) {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+      }
+      return res;
+    }).catch(() => caches.match(e.request))
   );
 });
