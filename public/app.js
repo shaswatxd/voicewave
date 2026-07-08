@@ -731,7 +731,18 @@
     selectedScreenSource = null;
     $('#screen-picker-share').disabled = true;
     // Restore last-used quality choices
-
+    const resSel = $('#picker-resolution');
+    if (resSel) {
+      resSel.value = shareResolution;
+    }
+    const fpsSel = $('#picker-fps');
+    if (fpsSel) {
+      fpsSel.value = String(shareFps);
+    }
+    const optSel = $('#picker-optimize');
+    if (optSel) {
+      optSel.value = shareOptimize;
+    }
     $('#screen-picker-modal').classList.add('open');
     const audioRow = $('#picker-audio-row');
     if (audioRow) audioRow.style.display = navigator.userAgent.includes('Windows') ? 'flex' : 'none';
