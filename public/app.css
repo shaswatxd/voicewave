@@ -1115,48 +1115,166 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
   .user-volume { margin-top: 10px; }
   .user-volume input[type="range"] { width: 100%; height: 4px; -webkit-appearance: none; background: rgba(255,255,255,0.08); border-radius: 2px; outline: none; }
   .user-volume input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--cyan); cursor: pointer; }
-  .user-actions { position: absolute; top: 4px; right: 4px; display: flex; gap: 4px; opacity: 0.5; transition: opacity 0.2s; z-index: 10; }
-  .user-card:hover .user-actions { opacity: 1; }
+  .user-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(5px);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10;
+  }
+  .user-card:hover .user-actions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
   .action-btn {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(30, 41, 59, 0.75);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 5px;
+    border-radius: 50%;
     cursor: pointer;
-    transition: all 0.2s ease;
-    color: var(--text);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: rgba(255, 255, 255, 0.8);
     padding: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   }
   .action-btn:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
-    transform: scale(1.1);
+    background: var(--bg-active);
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: scale(1.12);
+    color: #fff;
   }
   .action-btn svg {
     stroke-width: 2.2px;
+    width: 12px;
+    height: 12px;
+  }
+  .action-btn.btn-host {
+    background: rgba(234, 179, 8, 0.12);
+    border-color: rgba(234, 179, 8, 0.25);
+    color: #facc15;
+  }
+  .action-btn.btn-host:hover {
+    background: rgba(234, 179, 8, 0.3);
+    border-color: #facc15;
+    color: #fff;
   }
   .action-btn.btn-kick {
-    background: rgba(239, 68, 68, 0.1);
-    border-color: rgba(239, 68, 68, 0.2);
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.25);
     color: #f87171;
   }
   .action-btn.btn-kick:hover {
-    background: rgba(239, 68, 68, 0.2);
-    border-color: rgba(239, 68, 68, 0.45);
-    color: #ef4444;
+    background: rgba(239, 68, 68, 0.3);
+    border-color: #ef4444;
+    color: #fff;
   }
   .action-btn.btn-mute {
-    background: rgba(34, 211, 238, 0.08);
-    border-color: rgba(34, 211, 238, 0.15);
+    background: rgba(34, 211, 238, 0.12);
+    border-color: rgba(34, 211, 238, 0.25);
     color: var(--cyan);
   }
   .action-btn.btn-mute:hover {
-    background: rgba(34, 211, 238, 0.2);
+    background: rgba(34, 211, 238, 0.3);
     border-color: var(--cyan);
+    color: #fff;
+  }
+
+  /* Live Overlay on User Cards */
+  .live-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(4px);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 8;
+  }
+  .user-card.is-live:hover .live-overlay {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  #room.has-stage .live-overlay {
+    border-radius: 12px;
+  }
+  .watch-btn {
+    background: var(--success);
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(35, 165, 90, 0.4);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .watch-btn:hover {
+    background: #2ebd6c;
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(35, 165, 90, 0.6);
+  }
+  .watch-btn:active {
+    transform: scale(0.95);
+  }
+  .watch-text-short { display: none; }
+  #room.has-stage .watch-btn {
+    padding: 6px 10px;
+    font-size: 0.72rem;
+  }
+  #room.has-stage .watch-text-full { display: none; }
+  #room.has-stage .watch-text-short { display: inline; }
+  
+  /* Shift Connection Quality bar on Live Cards */
+  .user-card.is-live .connection-quality {
+    left: 48px;
+    transition: left 0.2s ease;
+  }
+
+  /* Interactive Toast Action styles */
+  .toast.has-action {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 260px;
+    gap: 12px;
+  }
+  .toast-action-btn {
+    background: var(--cyan);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-left: auto;
+  }
+  .toast-action-btn:hover {
+    background: #22d3ee;
+    transform: scale(1.05);
+  }
+  .toast-action-btn:active {
+    transform: scale(0.95);
   }
   .audio-meter { display: flex; gap: 2px; justify-content: center; margin-top: 8px; }
   .meter-bar { width: 4px; height: 14px; background: rgba(255,255,255,0.06); border-radius: 2px; transition: background 0.1s; }
@@ -1998,4 +2116,46 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
      fixed sheets themselves, just comfortably tappable. */
   .mention-item { padding: 12px 16px; font-size: 0.9rem; }
   .emoji-picker-item { width: 38px; height: 38px; font-size: 1.25rem; }
+}
+
+/* ── MOBILE BROWSER CUSTOM UI OVERRIDES ── */
+.is-mobile .profile-sidebar {
+  display: none !important;
+}
+
+.is-mobile .lobby-layout {
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.is-mobile .lobby-layout .lobby-container {
+  width: 100%;
+  max-width: 100%;
+  padding: 6vh 16px env(safe-area-inset-bottom);
+  box-sizing: border-box;
+}
+
+/* On mobile, direct tap watches the stream, so hide watch hover overlay */
+.is-mobile .live-overlay {
+  display: none !important;
+}
+
+/* Stacked admin actions always visible on mobile since touch has no hover */
+.is-mobile .user-actions {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  top: 6px;
+  right: 6px;
+}
+
+/* Ensure mobile cards look polished and spacious */
+.is-mobile .user-card {
+  border-radius: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.is-mobile .user-avatar {
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }

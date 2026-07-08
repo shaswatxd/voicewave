@@ -1,4 +1,9 @@
 (() => {
+  const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (isMobileDevice) {
+    document.documentElement.classList.add('is-mobile');
+  }
+
   const ICE_SERVERS = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
@@ -33,13 +38,13 @@
   // both the user-card hover actions and the profile popout, so clicks land
   // on the same document-level [data-*] delegated handlers either way.
   function buildAdminActionsHtml(socketId, muted, forceMuted) {
-    const hostBtnHtml = `<button class="action-btn" data-transfer="${socketId}" title="Transfer Host" style="margin-right:4px;">${SVG_CROWN}</button>`;
+    const hostBtnHtml = `<button class="action-btn btn-host" data-transfer="${socketId}" title="Transfer Host">${SVG_CROWN}</button>`;
     const muteAction = (muted && forceMuted) ? 'Unmute' : 'Mute';
     const muteSymbol = (muted && forceMuted) ? SVG_MUTE : SVG_AUDIO;
     return `
-      <div class="user-actions" style="display:flex; gap:4px;">
+      <div class="user-actions">
         ${hostBtnHtml}
-        <button class="action-btn btn-kick" data-kick="${socketId}" title="Kick user" style="margin-right:4px;">${SVG_KICK}</button>
+        <button class="action-btn btn-kick" data-kick="${socketId}" title="Kick user">${SVG_KICK}</button>
         <button class="action-btn btn-mute" data-force-mute="${socketId}" title="${muteAction} user">${muteSymbol}</button>
       </div>
     `;
@@ -246,15 +251,36 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
 
-  function toast(msg, type = 'info') {
+  function toast(msg, type = 'info', action = null) {
     const el = document.createElement('div');
     el.className = `toast ${type}`;
-    el.textContent = msg;
+    if (action) {
+      el.classList.add('has-action');
+      const textSpan = document.createElement('span');
+      textSpan.textContent = msg;
+      el.appendChild(textSpan);
+
+      const btn = document.createElement('button');
+      btn.className = 'toast-action-btn';
+      btn.textContent = action.text;
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        action.callback();
+        el.classList.add('fade-out');
+        el.addEventListener('animationend', () => el.remove());
+      };
+      el.appendChild(btn);
+    } else {
+      el.textContent = msg;
+    }
     $('#toast-container').appendChild(el);
+    const duration = action ? 7000 : 3200;
     setTimeout(() => {
-      el.classList.add('fade-out');
-      el.addEventListener('animationend', () => el.remove());
-    }, 3200);
+      if (el.parentNode) {
+        el.classList.add('fade-out');
+        el.addEventListener('animationend', () => el.remove());
+      }
+    }, duration);
   }
 
   function switchScreen(screen) {
@@ -1347,6 +1373,13 @@
       </div>
       ${muteBtnHtml}
       ${!isLocal ? `<div class="user-volume"><input type="range" min="0" max="100" value="80" data-peer-volume="${socketId}"></div>` : ''}
+      <div class="live-overlay">
+        <button class="watch-btn">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="margin-right:2px;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          <span class="watch-text-full">Watch Stream</span>
+          <span class="watch-text-short">Watch</span>
+        </button>
+      </div>
     `;
 
     return card;
@@ -2209,7 +2242,13 @@
         return;
       }
       renderScreenShares();
-      toast(`${data.name} started streaming 🖥️`, 'info');
+      toast(`${data.name} is live! 🖥️`, 'info', {
+        text: 'Watch',
+        callback: () => {
+          focusedShareId = data.socketId;
+          renderScreenShares();
+        }
+      });
     });
 
     socket.on('screen-share-stopped', (data) => {
@@ -3141,7 +3180,6 @@
     // Mobile browsers (Android/iOS) don't have a reliable getDisplayMedia
     // picker — some report the API as present but it fails or behaves
     // inconsistently — so screen share is desktop-only, full stop.
-    const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const screenShareBtn = $('#btn-screen-share');
     const canShareScreen = (window.electronAPI && window.electronAPI.isElectron) ||
       (!isMobileDevice && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
