@@ -411,16 +411,21 @@
 
   async function reportMicError(err) {
     const name = err ? err.name : '';
+    const settingsBtn = $('#mic-banner-settings');
+    if (settingsBtn) settingsBtn.style.display = 'none';
+
     if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
       if (window.electronAPI && window.electronAPI.getMicAccessStatus) {
         try {
           const status = await window.electronAPI.getMicAccessStatus();
           if (status === 'denied' || status === 'restricted') {
             toast('Windows has blocked the microphone — enable it in Settings → Privacy → Microphone', 'error');
+            if (settingsBtn && window.electronAPI.openMicSettings) settingsBtn.style.display = 'inline-flex';
             return;
           }
         } catch (e) { /* ignore */ }
         toast('Microphone access denied — check your system privacy settings', 'error');
+        if (settingsBtn && window.electronAPI.openMicSettings) settingsBtn.style.display = 'inline-flex';
       } else {
         toast('Mic blocked — click the 🔒 lock icon in the address bar and allow the microphone', 'error');
       }
@@ -3084,6 +3089,7 @@
 
     // Mic retry banner
     $('#mic-banner-retry')?.addEventListener('click', retryMic);
+    $('#mic-banner-settings')?.addEventListener('click', () => window.electronAPI?.openMicSettings());
 
     // Chat "new messages" pill + scroll tracking
     $('#chat-scroll-pill')?.addEventListener('click', () => scrollChatToBottom(true));

@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getScreenSources: () => ipcRenderer.invoke('get-screen-sources'),
   selectScreenSource: (sourceId, withAudio) => ipcRenderer.send('select-screen-source', { sourceId, withAudio }),
   getMicAccessStatus: () => ipcRenderer.invoke('get-mic-access-status'),
+  openMicSettings: () => ipcRenderer.send('open-mic-settings'),
   checkForUpdates: () => ipcRenderer.send('check-for-updates'),
   downloadUpdate: () => ipcRenderer.send('download-update'),
   installUpdate: () => ipcRenderer.send('install-update'),
