@@ -204,7 +204,8 @@ io.on('connection', (socket) => {
       moderators: room.moderators,
       history: room.history, // Send last 50 messages
       polls: room.polls, // Send active polls
-      pinned: room.pinned // Send pinned messages
+      pinned: room.pinned, // Send pinned messages
+      screenShare: room.screenShare || null // Ongoing screen share, if any
     });
 
     socket.to(roomId).emit('peer-joined', {
@@ -241,6 +242,26 @@ io.on('connection', (socket) => {
 
   socket.on('ice-candidate', ({ to, candidate }) => {
     io.to(to).emit('ice-candidate', { from: socket.id, candidate });
+  });
+
+  // 🖥️ Screen share signaling (one sharer per room)
+  socket.on('screen-share-start', ({ roomId, streamId }) => {
+    const room = rooms.get(roomId);
+    if (!room || !room.users.has(socket.id)) return;
+    if (room.screenShare && room.screenShare.socketId !== socket.id) {
+      socket.emit('screen-share-denied', { name: room.screenShare.name });
+      return;
+    }
+    room.screenShare = { socketId: socket.id, name: socket.userName, streamId };
+    io.to(roomId).emit('screen-share-started', room.screenShare);
+  });
+
+  socket.on('screen-share-stop', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (!room || !room.screenShare) return;
+    if (room.screenShare.socketId !== socket.id) return;
+    room.screenShare = null;
+    io.to(roomId).emit('screen-share-stopped', { socketId: socket.id });
   });
 
   socket.on('user-muted', ({ roomId, muted }) => {
@@ -449,6 +470,10 @@ io.on('connection', (socket) => {
         targetSocket.leave(roomId);
         targetSocket.roomId = null;
       }
+      if (room.screenShare && room.screenShare.socketId === targetId) {
+        room.screenShare = null;
+        io.to(roomId).emit('screen-share-stopped', { socketId: targetId });
+      }
       room.users.delete(targetId);
       io.to(roomId).emit('peer-left', { socketId: targetId });
     }
@@ -497,6 +522,12 @@ io.on('connection', (socket) => {
     room.users.delete(sock.id);
     sock.leave(roomId);
     sock.roomId = null;
+
+    // Clear screen share if the sharer left
+    if (room.screenShare && room.screenShare.socketId === sock.id) {
+      room.screenShare = null;
+      io.to(roomId).emit('screen-share-stopped', { socketId: sock.id });
+    }
 
     io.to(roomId).emit('peer-left', { socketId: sock.id });
 

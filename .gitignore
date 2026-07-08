@@ -4,3 +4,4 @@ build/
 rooms.json
 .env
 *.log
+.claude/

@@ -12,7 +12,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.54">
+<link rel="stylesheet" href="/app.css?v=1.0.55">
 <!-- Consolidated Styles moved to app.css -->
 </head>
 <body>
@@ -94,6 +94,7 @@
 
       <div class="feature-pills">
         <span class="pill">🎙️ P2P Voice</span>
+        <span class="pill">🖥️ Screen Share</span>
         <span class="pill">💬 Chat</span>
         <span class="pill">🔒 Password Rooms</span>
         <span class="pill">📱 Works Everywhere</span>
@@ -204,9 +205,41 @@
     </div>
   </div>
 
+  <!-- MIC UNAVAILABLE BANNER -->
+  <div class="mic-banner" id="mic-banner">
+    <span>🎤 Microphone unavailable — others can't hear you</span>
+    <button class="btn btn-sm btn-primary" id="mic-banner-retry">Retry Mic</button>
+  </div>
+
   <div class="room-body">
-    <!-- User Grid -->
-    <div class="user-grid" id="user-grid"></div>
+    <div class="room-main">
+      <!-- Screen Share Stage -->
+      <div class="screen-stage" id="screen-stage">
+        <div class="stage-header">
+          <span class="live-badge"><span class="live-dot"></span>LIVE</span>
+          <span class="stage-sharer" id="stage-sharer-name">Screen share</span>
+          <div class="stage-actions">
+            <button class="btn-icon stage-btn" id="stage-fullscreen" title="Fullscreen">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+            </button>
+            <button class="btn-icon stage-btn stage-stop" id="stage-stop" title="Stop sharing" style="display:none;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+              Stop
+            </button>
+          </div>
+        </div>
+        <div class="stage-video-wrap" id="stage-video-wrap">
+          <video id="stage-video" autoplay playsinline></video>
+          <div class="stage-waiting" id="stage-waiting">
+            <div class="connecting-spinner" style="width:36px;height:36px;"></div>
+            <span>Connecting to stream…</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- User Grid -->
+      <div class="user-grid" id="user-grid"></div>
+    </div>
 
     <!-- Chat Panel -->
     <div class="chat-panel" id="chat-panel">
@@ -224,11 +257,15 @@
         </div>
       </div>
       <div class="chat-messages" id="chat-messages"></div>
+      <button class="chat-scroll-pill" id="chat-scroll-pill" style="display:none;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+        New messages
+      </button>
       <div class="typing-indicator" id="typing-indicator" style="display:none;">
         <span class="typing-dots"><span></span><span></span><span></span></span>
         <span id="typing-user"></span> is typing...
       </div>
-      <div id="reply-banner" style="display:none; padding:8px 16px; background:rgba(34,211,238,0.08); border-top:1px solid rgba(34,211,238,0.15); display:flex; align-items:center; justify-content:space-between; font-size:0.78rem; color:#22d3ee; border-radius:8px 8px 0 0;">
+      <div id="reply-banner" style="display:none; padding:8px 16px; background:rgba(34,211,238,0.08); border-top:1px solid rgba(34,211,238,0.15); align-items:center; justify-content:space-between; font-size:0.78rem; color:#22d3ee; border-radius:8px 8px 0 0;">
         <span id="reply-banner-text">Replying to...</span>
         <span id="btn-cancel-reply" style="cursor:pointer; font-weight:bold; font-size:0.95rem; padding:2px 6px;">✕</span>
       </div>
@@ -271,6 +308,12 @@
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
         </span>
         <span class="control-label">Deafen</span>
+      </button>
+      <button class="control-btn" id="btn-screen-share" title="Share Screen" style="display:none;">
+        <span class="control-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+        </span>
+        <span class="control-label" id="screen-share-label">Share</span>
       </button>
     </div>
 
@@ -520,6 +563,31 @@
   </div>
 </div>
 
+<!-- SCREEN SHARE SOURCE PICKER -->
+<div class="modal" id="screen-picker-modal">
+  <div class="modal-card screen-picker-card">
+    <h3>🖥️ Share your screen</h3>
+    <p>Choose a screen or window to share with the room</p>
+    <div class="picker-tabs">
+      <button class="picker-tab active" data-source-type="screen">Screens</button>
+      <button class="picker-tab" data-source-type="window">Windows</button>
+    </div>
+    <div class="source-grid" id="screen-source-grid">
+      <div class="source-loading">
+        <div class="connecting-spinner" style="width:28px;height:28px;"></div>
+      </div>
+    </div>
+    <label class="picker-audio-toggle" id="picker-audio-row">
+      <input type="checkbox" id="picker-share-audio" checked>
+      <span>Share system audio <small>(Windows — voices of others may echo back while they talk)</small></span>
+    </label>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="screen-picker-cancel">Cancel</button>
+      <button class="btn btn-primary" id="screen-picker-share" disabled>Go Live</button>
+    </div>
+  </div>
+</div>
+
 <!-- FULLSCREEN IMAGE LIGHTBOX -->
 <div class="modal" id="lightbox-modal" style="background:rgba(0,0,0,0.92); z-index:2000;">
   <div style="position:relative; max-width:90%; max-height:90%; display:flex; align-items:center; justify-content:center; flex-direction:column;">
@@ -530,7 +598,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.54';
+  window.APP_VERSION = '1.0.55';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -563,6 +631,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.54"></script>
+<script src="/app.js?v=1.0.55"></script>
 </body>
 </html>

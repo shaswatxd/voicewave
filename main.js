@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, globalShortcut } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, globalShortcut, desktopCapturer, systemPreferences } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
@@ -466,6 +466,39 @@ ipcMain.on('update-room-state', (event, inRoomState) => {
   updateTrayMenu();
 });
 
+// ── SCREEN SHARE (desktop only) ──
+// Holds the source the user picked in the renderer's custom picker,
+// consumed by setDisplayMediaRequestHandler when getDisplayMedia() is called.
+let pendingScreenShare = null; // { sourceId, withAudio }
+
+ipcMain.handle('get-screen-sources', async () => {
+  const sources = await desktopCapturer.getSources({
+    types: ['screen', 'window'],
+    thumbnailSize: { width: 320, height: 180 },
+    fetchWindowIcons: true
+  });
+  return sources.map(s => ({
+    id: s.id,
+    name: s.name,
+    isScreen: s.id.startsWith('screen'),
+    thumbnail: s.thumbnail.isEmpty() ? null : s.thumbnail.toDataURL(),
+    appIcon: s.appIcon && !s.appIcon.isEmpty() ? s.appIcon.toDataURL() : null
+  }));
+});
+
+ipcMain.on('select-screen-source', (event, payload) => {
+  pendingScreenShare = payload; // { sourceId, withAudio }
+});
+
+// Windows mic privacy status — lets the renderer show a helpful hint
+ipcMain.handle('get-mic-access-status', () => {
+  try {
+    return systemPreferences.getMediaAccessStatus('microphone');
+  } catch {
+    return 'unknown';
+  }
+});
+
 // ── AUTO UPDATER ──
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
@@ -531,11 +564,29 @@ process.on('unhandledRejection', (reason) => {
 app.whenReady().then(() => {
   // Grant all media-related permissions automatically
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
-    const allowed = ['media', 'microphone', 'camera', 'notifications', 'mediaKeySystem', 'audioCapture'];
+    const allowed = ['media', 'microphone', 'camera', 'notifications', 'mediaKeySystem', 'audioCapture', 'display-capture'];
     if (allowed.includes(permission)) {
       callback(true);
     } else {
       callback(false);
+    }
+  });
+
+  // Serve getDisplayMedia() with the source the user picked in our custom picker.
+  // 'loopback' captures system audio (Windows only).
+  session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
+    try {
+      const pick = pendingScreenShare;
+      pendingScreenShare = null;
+      const sources = await desktopCapturer.getSources({ types: ['screen', 'window'] });
+      let source = pick ? sources.find(s => s.id === pick.sourceId) : null;
+      if (!source) source = sources.find(s => s.id.startsWith('screen')) || sources[0];
+      if (!source) return callback({});
+      const wantAudio = pick ? !!pick.withAudio : false;
+      callback({ video: source, audio: (wantAudio && process.platform === 'win32') ? 'loopback' : undefined });
+    } catch (err) {
+      console.error('[VoiceWave] DisplayMedia handler error:', err);
+      callback({});
     }
   });
 
