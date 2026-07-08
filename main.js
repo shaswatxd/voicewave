@@ -22,8 +22,12 @@ let isDeafened = false;
 let inRoom = false;
 
 const SERVER_URL = 'https://voicewave-7ozn.onrender.com';
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 3000;
+// The free-tier host spins down after ~15min idle and can take 30-90s to
+// cold-start — a flat 3-retry/3s budget (~9s) gives up long before that.
+// Backed-off delays give a realistic ~45s runway instead.
+const MAX_RETRIES = 6;
+const RETRY_DELAYS = [2000, 3000, 5000, 8000, 12000, 15000];
+let currentLoadIsRetrying = false;
 
 // ── Loading screen HTML ──
 function getLoadingHTML() {
@@ -130,27 +134,40 @@ function getErrorHTML(errorMsg) {
   <h1>Can't Connect</h1>
   <p class="msg">VoiceWave couldn't reach the server. This usually means you're offline or the server is down.</p>
   <div class="detail">${errorMsg}</div>
-  <button onclick="window.location.reload()">Try Again</button><br>
+  <button onclick="location.href='${SERVER_URL}/app'">Try Again</button><br>
   <button class="quit-btn" onclick="window.close()">Quit</button>
 </div></body></html>`;
 }
 
 // ── Load server URL with retry ──
 function loadWithRetry(win, url, attempt = 1) {
-  win.loadURL(url).catch((err) => {
+  currentLoadIsRetrying = true;
+  // Render's edge can hold the connection open and eventually respond
+  // successfully after 30-90s on a cold dyno — no loadURL rejection ever
+  // fires in that case, so there's nothing for .catch() to react to. This
+  // watchdog keeps the user honestly informed while that's happening.
+  const watchdog = setTimeout(() => {
+    win.webContents.executeJavaScript(`
+      try { document.getElementById('status').textContent = 'Server is waking up — this can take up to a minute…'; } catch(e) {}
+    `).catch(() => {});
+  }, 6000);
+
+  win.loadURL(url).then(() => {
+    currentLoadIsRetrying = false;
+  }).catch((err) => {
     if (attempt < MAX_RETRIES) {
-      // Update loading screen status
       win.webContents.executeJavaScript(`
         try {
           document.getElementById('status').textContent = 'Retrying... (${attempt}/${MAX_RETRIES})';
         } catch(e) {}
       `).catch(() => {});
-      setTimeout(() => loadWithRetry(win, url, attempt + 1), RETRY_DELAY);
+      setTimeout(() => loadWithRetry(win, url, attempt + 1), RETRY_DELAYS[attempt - 1]);
     } else {
       // All retries failed — show error page
+      currentLoadIsRetrying = false;
       win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(getErrorHTML(err.message || 'Server unreachable'))}`);
     }
-  });
+  }).finally(() => clearTimeout(watchdog));
 }
 
 function createWindow() {
@@ -168,7 +185,12 @@ function createWindow() {
       nodeIntegration: false,
       webSecurity: false,
       allowRunningInsecureContent: false,
-      spellcheck: false
+      spellcheck: false,
+      // Chromium throttles renderer timers (setInterval/rAF) when the window
+      // is unfocused or hidden — that includes alt-tab and "minimize to
+      // tray". Without this, the 100ms speaking-indicator poll freezes even
+      // though WebRTC audio (separate threads) keeps flowing fine.
+      backgroundThrottling: false
     },
     backgroundColor: '#060a12',
     show: false
@@ -187,6 +209,10 @@ function createWindow() {
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     // Ignore aborted loads (e.g. user navigated away) and data: URLs
     if (errorCode === -3 || validatedURL.startsWith('data:')) return;
+    // loadWithRetry fires on this same failure via its own .catch() — if
+    // it's mid-attempt, let IT decide (retry or show the error page) instead
+    // of both handlers racing to navigate and flickering error→loading→error.
+    if (currentLoadIsRetrying) return;
     mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(getErrorHTML(`${errorDescription} (code: ${errorCode})`))}`);
   });
 

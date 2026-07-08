@@ -140,6 +140,8 @@
   let roomId = null;
   let roomPassword = null;
   let isCreator = false;
+  let connectingTimers = [];   // all pending timers for the current "connecting" session
+  let midSessionErrorShown = false; // avoid one toast per background reconnect attempt
   let isMuted = false;
   let isForceMuted = false;
   let isDeafened = false;
@@ -661,7 +663,8 @@
       polite: mySocketId < socketId,
       makingOffer: false,
       ignoreOffer: false,
-      pendingCandidates: []
+      pendingCandidates: [],
+      iceDisconnectTimer: null
     };
     peers[socketId] = peer;
 
@@ -721,8 +724,19 @@
     };
 
     pc.oniceconnectionstatechange = () => {
-      if (pc.iceConnectionState === 'failed') {
-        pc.restartIce();
+      const state = pc.iceConnectionState;
+      if (state === 'disconnected') {
+        // 'disconnected' is often self-healing within a few seconds (brief
+        // Wi-Fi roam, NAT flap) — browsers wait 20-30s before escalating to
+        // 'failed' on their own. Debounce a restart to beat that cliff
+        // without restarting on every transient blip.
+        clearTimeout(peer.iceDisconnectTimer);
+        peer.iceDisconnectTimer = setTimeout(() => {
+          if (pc.iceConnectionState === 'disconnected') pc.restartIce();
+        }, 3000);
+      } else {
+        clearTimeout(peer.iceDisconnectTimer);
+        if (state === 'failed') pc.restartIce();
       }
     };
 
@@ -1329,6 +1343,7 @@
     }
 
     if (peers[socketId]) {
+      clearTimeout(peers[socketId].iceDisconnectTimer);
       peers[socketId].pc.close();
       delete peers[socketId];
     }
@@ -1713,6 +1728,36 @@
     if (micCheck) micCheck.checked = roomPermissions.allowMic;
   }
 
+  // ── CONNECTING OVERLAY — owns its own timers so no call site can leave a
+  // stale timeout armed after a legitimate dismiss (see dismissConnectingOverlay). ──
+  function updateConnectingSub(text) {
+    const el = $('#connecting-sub');
+    if (el) el.textContent = text;
+  }
+
+  function beginConnecting() {
+    const overlay = $('#connecting-overlay');
+    if (overlay.classList.contains('show')) return; // already mid-attempt — don't stack timers
+    overlay.classList.add('show');
+    updateConnectingSub('Setting up your voice room');
+    // The signaling host is free-tier and can cold-start in 30-90s — give it
+    // a real runway instead of a flat cliff, with honest progressive status.
+    connectingTimers.push(setTimeout(() => updateConnectingSub('Still connecting — server may be waking up…'), 8000));
+    connectingTimers.push(setTimeout(() => updateConnectingSub('This can take up to a minute on a cold start…'), 25000));
+    connectingTimers.push(setTimeout(() => {
+      dismissConnectingOverlay();
+      if (socket) socket.disconnect(); // deterministic stop — no silent background retry after giving up
+      window._pendingJoin = null;
+      toast("Couldn't reach the server — please try again", 'error');
+    }, 55000));
+  }
+
+  function dismissConnectingOverlay() {
+    connectingTimers.forEach(t => clearTimeout(t));
+    connectingTimers = [];
+    $('#connecting-overlay').classList.remove('show');
+  }
+
   function connectSocket() {
     if (socket && socket.connected) return;
     if (socket) { socket.disconnect(); socket = null; }
@@ -1723,10 +1768,14 @@
 
     socket.on('connect', () => {
       mySocketId = socket.id;
+      midSessionErrorShown = false;
       toast('Connected to server', 'success');
       if (window._pendingJoin) {
+        // Don't clear _pendingJoin here — only once the outcome is known
+        // (room-joined or a room-error event). If this same connection
+        // drops before the server responds (plausible mid cold-start),
+        // the next successful 'connect' needs it to still be there to retry.
         socket.emit('join-room', window._pendingJoin);
-        window._pendingJoin = null;
       } else if (roomId) {
         // Auto-rejoin after a dropped connection — old peer connections are
         // stale (socket ids changed), so tear down and rebuild from scratch.
@@ -1740,22 +1789,42 @@
     });
 
     socket.on('disconnect', (reason) => {
-      $('#connecting-overlay').classList.remove('show');
       if (reason === 'io server disconnect') {
+        // Explicit ban/kick — server won't let us back in, no point retrying.
+        dismissConnectingOverlay();
+        window._pendingJoin = null;
         toast('Disconnected by server (banned/kicked)', 'error');
-      } else {
-        toast('Disconnected from server', 'error');
+        return;
       }
+      if ($('#connecting-overlay').classList.contains('show')) {
+        // Mid-join drop — Socket.IO's built-in reconnection is already
+        // retrying underneath; stay on the overlay instead of bailing.
+        updateConnectingSub('Connection dropped — reconnecting…');
+        return;
+      }
+      toast('Disconnected from server', 'error');
     });
 
-    socket.on('connect_error', (e) => {
-      $('#connecting-overlay').classList.remove('show');
-      toast('Connection failed — check internet', 'error');
+    socket.on('connect_error', () => {
+      if ($('#connecting-overlay').classList.contains('show')) {
+        // Exactly what a cold free-tier host looks like on the first
+        // attempt(s) — the staged messages + ceiling timer in
+        // beginConnecting() already own this UX. Socket.IO keeps retrying
+        // on its own default backoff; no need to react per-attempt here.
+        return;
+      }
+      // A background reconnect during an already-established session —
+      // surface it once, not once per retry attempt.
+      if (!midSessionErrorShown) {
+        midSessionErrorShown = true;
+        toast('Connection issue — retrying…', 'error');
+      }
     });
 
     socket.on('room-joined', async (data) => {
       roomId = data.roomId;
       roomPassword = (window._pendingJoin && window._pendingJoin.password) || roomPassword || null;
+      window._pendingJoin = null; // outcome is now known — safe to clear
       isCreator = data.isCreator;
       window._iAmCreator = isCreator;
       roomPermissions = data.permissions || { allowChat: true, allowMic: true };
@@ -1771,7 +1840,7 @@
       renderPollsList();
 
       switchScreen('room');
-      $('#connecting-overlay').classList.remove('show');
+      dismissConnectingOverlay();
       $('#room-id-display').textContent = roomId;
 
       roomStartTime = Date.now();
@@ -1838,19 +1907,20 @@
       }
     });
 
-    socket.on('room-not-found', () => { $('#connecting-overlay').classList.remove('show'); toast('Room not found', 'error'); });
-    socket.on('room-wrong-password', () => { $('#connecting-overlay').classList.remove('show'); toast('Wrong password', 'error'); });
-    socket.on('room-full', () => { $('#connecting-overlay').classList.remove('show'); toast('Room is full (max 30)', 'error'); });
-    socket.on('room-locked-error', () => { $('#connecting-overlay').classList.remove('show'); toast('Room is currently locked!', 'error'); });
-    socket.on('room-banned-error', () => { $('#connecting-overlay').classList.remove('show'); toast('You are banned from this room!', 'error'); });
+    const dismissWithPendingClear = () => { dismissConnectingOverlay(); window._pendingJoin = null; };
+    socket.on('room-not-found', () => { dismissWithPendingClear(); toast('Room not found', 'error'); });
+    socket.on('room-wrong-password', () => { dismissWithPendingClear(); toast('Wrong password', 'error'); });
+    socket.on('room-full', () => { dismissWithPendingClear(); toast('Room is full (max 30)', 'error'); });
+    socket.on('room-locked-error', () => { dismissWithPendingClear(); toast('Room is currently locked!', 'error'); });
+    socket.on('room-banned-error', () => { dismissWithPendingClear(); toast('You are banned from this room!', 'error'); });
     socket.on('room-warning', (data) => toast(data.message, 'info'));
     socket.on('room-requires-password', () => {
-      $('#connecting-overlay').classList.remove('show');
+      dismissWithPendingClear();
       $('#password-modal').classList.add('open');
     });
     socket.on('room-has-password', (data) => {
       if (data.hasPassword) {
-        $('#connecting-overlay').classList.remove('show');
+        dismissWithPendingClear();
         $('#password-modal').classList.add('open');
       }
     });
@@ -3296,8 +3366,7 @@
       const code = generateRoomId();
       const password = $('#create-password').value;
       preacquireMic();
-      $('#connecting-overlay').classList.add('show');
-      setTimeout(() => { if ($('#connecting-overlay').classList.contains('show')) { $('#connecting-overlay').classList.remove('show'); toast('Connection timed out', 'error'); } }, 15000);
+      beginConnecting();
       window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: false, password, avatar: getAvatarPayload() };
       connectSocket();
     });
@@ -3310,8 +3379,7 @@
       if (!code) return toast('Enter room code', 'error');
       window.userName = name;
       preacquireMic();
-      $('#connecting-overlay').classList.add('show');
-      setTimeout(() => { if ($('#connecting-overlay').classList.contains('show')) { $('#connecting-overlay').classList.remove('show'); toast('Connection timed out', 'error'); } }, 15000);
+      beginConnecting();
 
       if (!socket || !socket.connected) {
         window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: true, password, avatar: getAvatarPayload() };
@@ -3325,12 +3393,15 @@
       const password = $('#modal-password').value;
       let code = $('#join-code').value.trim().toUpperCase().replace(/0/g, 'O').replace(/1/g, 'I');
       window._pendingJoin = { roomId: code, userName: window.userName, muted: false, joinOnly: true, password, avatar: getAvatarPayload() };
+      $('#password-modal').classList.remove('open');
+      beginConnecting();
       if (socket && socket.connected) {
         socket.emit('join-room', { roomId: code, userName: window.userName, muted: false, joinOnly: true, password, avatar: getAvatarPayload() });
+      } else {
+        // Socket dropped while the password modal was open — reconnect
+        // instead of leaving the overlay spinning with no attempt in flight.
+        connectSocket();
       }
-      $('#password-modal').classList.remove('open');
-      $('#connecting-overlay').classList.add('show');
-      setTimeout(() => { if ($('#connecting-overlay').classList.contains('show')) { $('#connecting-overlay').classList.remove('show'); toast('Connection timed out', 'error'); } }, 15000);
     });
 
     $('#modal-cancel').addEventListener('click', () => {
