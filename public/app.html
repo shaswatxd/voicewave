@@ -12,7 +12,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.55">
+<link rel="stylesheet" href="/app.css?v=1.0.57">
 <!-- Consolidated Styles moved to app.css -->
 </head>
 <body>
@@ -218,7 +218,15 @@
         <div class="stage-header">
           <span class="live-badge"><span class="live-dot"></span>LIVE</span>
           <span class="stage-sharer" id="stage-sharer-name">Screen share</span>
+          <span class="stage-count" id="stage-count" style="display:none;"></span>
           <div class="stage-actions">
+            <div class="stage-volume-wrap" id="stage-volume-wrap" title="Stream volume">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              <input type="range" id="stage-volume" min="0" max="100" value="100">
+            </div>
+            <button class="btn-icon stage-btn" id="stage-pip" title="Picture in Picture">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><rect width="8" height="5" x="12" y="12" rx="1" fill="currentColor"/></svg>
+            </button>
             <button class="btn-icon stage-btn" id="stage-fullscreen" title="Fullscreen">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
             </button>
@@ -235,6 +243,7 @@
             <span>Connecting to stream…</span>
           </div>
         </div>
+        <div class="stage-thumbs" id="stage-thumbs" style="display:none;"></div>
       </div>
 
       <!-- User Grid -->
@@ -351,29 +360,87 @@
 
 <!-- SETTINGS MODAL -->
 <div class="modal" id="settings-modal">
-  <div class="modal-card modal-wide">
-    <h3>Settings</h3>
+  <div class="modal-card settings-card">
+    <div class="settings-header">
+      <h3>⚙️ Settings</h3>
+      <button class="btn-icon settings-x" id="settings-close" title="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+      </button>
+    </div>
     <div class="settings-grid">
+
+      <div class="settings-section-title">🔊 Audio</div>
       <div class="setting-item">
         <label>Master Volume</label>
-        <input type="range" id="master-volume" min="0" max="100" value="75">
-        <span class="setting-value" id="master-volume-val">75%</span>
+        <div class="setting-slider-row">
+          <input type="range" id="master-volume" min="0" max="100" value="75">
+          <span class="setting-value" id="master-volume-val">75%</span>
+        </div>
       </div>
       <div class="setting-item">
         <label>Mic Gain</label>
-        <input type="range" id="mic-gain" min="0" max="300" value="100">
-        <span class="setting-value" id="mic-gain-val">100%</span>
+        <div class="setting-slider-row">
+          <input type="range" id="mic-gain" min="0" max="300" value="100">
+          <span class="setting-value" id="mic-gain-val">100%</span>
+        </div>
       </div>
       <div class="setting-item">
         <label>Noise Gate Threshold</label>
-        <input type="range" id="noise-threshold" min="5" max="40" value="12">
-        <span class="setting-value" id="noise-threshold-val">12</span>
+        <div class="setting-slider-row">
+          <input type="range" id="noise-threshold" min="5" max="40" value="12">
+          <span class="setting-value" id="noise-threshold-val">12</span>
+        </div>
       </div>
       <div class="setting-item">
         <label>Soundboard Volume</label>
-        <input type="range" id="setting-soundboard-volume" min="0" max="100" value="60">
-        <span class="setting-value" id="soundboard-volume-val">60%</span>
+        <div class="setting-slider-row">
+          <input type="range" id="setting-soundboard-volume" min="0" max="100" value="60">
+          <span class="setting-value" id="soundboard-volume-val">60%</span>
+        </div>
       </div>
+
+      <div class="settings-section-title">🎙️ Devices &amp; Voice</div>
+      <div class="setting-item">
+        <label>Input Device</label>
+        <select id="input-device"></select>
+      </div>
+      <div class="setting-item">
+        <label>Output Device</label>
+        <select id="output-device"></select>
+      </div>
+      <div class="setting-item setting-span-2">
+        <label>Mic Test</label>
+        <canvas id="settings-audio-visualizer" style="width:100%; height:40px; background:rgba(0,0,0,0.25); border-radius:8px; display:block;"></canvas>
+      </div>
+      <div class="setting-item setting-toggle">
+        <label class="toggle-label">
+          <input type="checkbox" id="setting-ptt-enabled">
+          <span>Enable Push-to-Talk</span>
+        </label>
+      </div>
+      <div class="setting-item" id="ptt-key-container" style="display:none;">
+        <label>PTT Activation Key</label>
+        <select id="setting-ptt-key" style="margin:0;">
+          <option value="Space">Spacebar</option>
+          <option value="KeyV">V Key</option>
+          <option value="KeyB">B Key</option>
+          <option value="AltLeft">Left Alt</option>
+        </select>
+      </div>
+      <div class="setting-item setting-toggle">
+        <label class="toggle-label">
+          <input type="checkbox" id="setting-echo-cancellation" checked>
+          <span>Echo Cancellation</span>
+        </label>
+      </div>
+      <div class="setting-item setting-toggle">
+        <label class="toggle-label">
+          <input type="checkbox" id="setting-low-bandwidth">
+          <span>Low Bandwidth Mode</span>
+        </label>
+      </div>
+
+      <div class="settings-section-title">🎨 Appearance &amp; Chat</div>
       <div class="setting-item">
         <label>Chat Text Size</label>
         <select id="setting-chat-size">
@@ -391,58 +458,20 @@
           <option value="glass">Classic Glass</option>
         </select>
       </div>
-      <div class="setting-item">
-        <label>Input Device</label>
-        <select id="input-device"></select>
-      </div>
-      <div class="setting-item">
-        <label>Output Device</label>
-        <select id="output-device"></select>
-      </div>
-      <div class="setting-item">
-        <label>Audio Visualizer</label>
-        <canvas id="settings-audio-visualizer" style="width:100%; height:40px; background:rgba(0,0,0,0.25); border-radius:8px; display:block;"></canvas>
-      </div>
-      <div class="setting-item" style="border-top: 1px solid rgba(255,255,255,0.04); padding-top: 12px;">
-        <label style="display:flex; align-items:center; gap:8px; text-transform:none; cursor:pointer;">
-          <input type="checkbox" id="setting-ptt-enabled" style="width:auto; margin:0;">
-          <span>Enable Push-to-Talk</span>
-        </label>
-      </div>
-      <div class="setting-item" id="ptt-key-container" style="display:none;">
-        <label>PTT Activation Key</label>
-        <select id="setting-ptt-key" style="margin:0;">
-          <option value="Space">Spacebar</option>
-          <option value="KeyV">V Key</option>
-          <option value="KeyB">B Key</option>
-          <option value="AltLeft">Left Alt</option>
-        </select>
-      </div>
-      <div class="setting-item">
-        <label style="display:flex; align-items:center; gap:8px; text-transform:none; cursor:pointer;">
-          <input type="checkbox" id="setting-echo-cancellation" checked style="width:auto; margin:0;">
-          <span>Echo Cancellation</span>
-        </label>
-      </div>
-      <div class="setting-item">
-        <label style="display:flex; align-items:center; gap:8px; text-transform:none; cursor:pointer;">
-          <input type="checkbox" id="setting-low-bandwidth" style="width:auto; margin:0;">
-          <span>Low Bandwidth Mode</span>
-        </label>
-      </div>
-      <div class="setting-item">
-        <label style="display:flex; align-items:center; gap:8px; text-transform:none; cursor:pointer;">
-          <input type="checkbox" id="setting-sound-notifications" checked style="width:auto; margin:0;">
+      <div class="setting-item setting-toggle">
+        <label class="toggle-label">
+          <input type="checkbox" id="setting-sound-notifications" checked>
           <span>Sound Notifications</span>
         </label>
       </div>
+
     </div>
-    <div class="modal-actions" style="margin-top:20px;">
+    <div class="modal-actions settings-footer">
       <button class="btn btn-ghost" id="btn-record" title="Record Session">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
         <span id="record-label">Record</span>
       </button>
-      <button class="btn btn-ghost" id="settings-close">Close</button>
+      <button class="btn btn-primary" id="settings-done">Done</button>
     </div>
   </div>
 </div>
@@ -577,6 +606,33 @@
         <div class="connecting-spinner" style="width:28px;height:28px;"></div>
       </div>
     </div>
+    <div class="picker-quality-row">
+      <div class="picker-quality-field">
+        <label>Resolution</label>
+        <select id="picker-resolution">
+          <option value="720">720p</option>
+          <option value="1080" selected>1080p</option>
+          <option value="1440">1440p</option>
+          <option value="source">Source</option>
+        </select>
+      </div>
+      <div class="picker-quality-field">
+        <label>Frame Rate</label>
+        <select id="picker-fps">
+          <option value="15">15 FPS</option>
+          <option value="30" selected>30 FPS</option>
+          <option value="60">60 FPS (Smooth)</option>
+        </select>
+      </div>
+      <div class="picker-quality-field">
+        <label>Optimize For</label>
+        <select id="picker-optimize">
+          <option value="auto" selected>Auto</option>
+          <option value="detail">Text Clarity</option>
+          <option value="motion">Smooth Motion</option>
+        </select>
+      </div>
+    </div>
     <label class="picker-audio-toggle" id="picker-audio-row">
       <input type="checkbox" id="picker-share-audio" checked>
       <span>Share system audio <small>(Windows — voices of others may echo back while they talk)</small></span>
@@ -598,7 +654,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.55';
+  window.APP_VERSION = '1.0.57';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -631,6 +687,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.55"></script>
+<script src="/app.js?v=1.0.57"></script>
 </body>
 </html>

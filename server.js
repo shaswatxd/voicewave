@@ -17,6 +17,7 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 3000;
 const MAX_USERS = 30;
 const WARN_USERS = 20;
+const MAX_SCREEN_SHARES = 6; // Discord-style: multiple people can stream at once
 const ROOMS_FILE = path.join(__dirname, 'rooms.json');
 
 const rooms = new Map();
@@ -39,7 +40,8 @@ function loadRoomsFromDisk() {
           moderators: r.moderators || [], // Array of usernames or socket IDs
           history: r.history || [], // Last 50 chat messages
           polls: r.polls || [], // Active polls
-          pinned: r.pinned || [] // Pinned messages
+          pinned: r.pinned || [], // Pinned messages
+          screenShares: {} // Live screen shares (never persisted)
         });
       });
       console.log(`Loaded ${rooms.size} persistent rooms from disk.`);
@@ -125,7 +127,8 @@ io.on('connection', (socket) => {
         moderators: [],
         history: [],
         polls: [],
-        pinned: []
+        pinned: [],
+        screenShares: {}
       };
       rooms.set(roomId, room);
       saveRoomsToDisk();
@@ -205,7 +208,7 @@ io.on('connection', (socket) => {
       history: room.history, // Send last 50 messages
       polls: room.polls, // Send active polls
       pinned: room.pinned, // Send pinned messages
-      screenShare: room.screenShare || null // Ongoing screen share, if any
+      screenShares: Object.values(room.screenShares || {}) // Ongoing screen shares, if any
     });
 
     socket.to(roomId).emit('peer-joined', {
@@ -244,23 +247,24 @@ io.on('connection', (socket) => {
     io.to(to).emit('ice-candidate', { from: socket.id, candidate });
   });
 
-  // 🖥️ Screen share signaling (one sharer per room)
+  // 🖥️ Screen share signaling (Discord-style — multiple simultaneous sharers)
   socket.on('screen-share-start', ({ roomId, streamId }) => {
     const room = rooms.get(roomId);
     if (!room || !room.users.has(socket.id)) return;
-    if (room.screenShare && room.screenShare.socketId !== socket.id) {
-      socket.emit('screen-share-denied', { name: room.screenShare.name });
+    if (!room.screenShares) room.screenShares = {};
+    const alreadySharing = !!room.screenShares[socket.id];
+    if (!alreadySharing && Object.keys(room.screenShares).length >= MAX_SCREEN_SHARES) {
+      socket.emit('screen-share-denied', { reason: 'limit', max: MAX_SCREEN_SHARES });
       return;
     }
-    room.screenShare = { socketId: socket.id, name: socket.userName, streamId };
-    io.to(roomId).emit('screen-share-started', room.screenShare);
+    room.screenShares[socket.id] = { socketId: socket.id, name: socket.userName, streamId };
+    io.to(roomId).emit('screen-share-started', room.screenShares[socket.id]);
   });
 
   socket.on('screen-share-stop', ({ roomId }) => {
     const room = rooms.get(roomId);
-    if (!room || !room.screenShare) return;
-    if (room.screenShare.socketId !== socket.id) return;
-    room.screenShare = null;
+    if (!room || !room.screenShares || !room.screenShares[socket.id]) return;
+    delete room.screenShares[socket.id];
     io.to(roomId).emit('screen-share-stopped', { socketId: socket.id });
   });
 
@@ -470,8 +474,8 @@ io.on('connection', (socket) => {
         targetSocket.leave(roomId);
         targetSocket.roomId = null;
       }
-      if (room.screenShare && room.screenShare.socketId === targetId) {
-        room.screenShare = null;
+      if (room.screenShares && room.screenShares[targetId]) {
+        delete room.screenShares[targetId];
         io.to(roomId).emit('screen-share-stopped', { socketId: targetId });
       }
       room.users.delete(targetId);
@@ -524,8 +528,8 @@ io.on('connection', (socket) => {
     sock.roomId = null;
 
     // Clear screen share if the sharer left
-    if (room.screenShare && room.screenShare.socketId === sock.id) {
-      room.screenShare = null;
+    if (room.screenShares && room.screenShares[sock.id]) {
+      delete room.screenShares[sock.id];
       io.to(roomId).emit('screen-share-stopped', { socketId: sock.id });
     }
 

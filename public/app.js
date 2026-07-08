@@ -164,10 +164,16 @@
     }
   }
 
-  // ── SCREEN SHARE STATE ──
+  // ── SCREEN SHARE STATE (Discord-style: many people can stream at once) ──
   let screenStream = null;
   let isScreenSharing = false;
-  let activeScreenShare = null; // { socketId, name, streamId } — current sharer in room
+  let screenShares = {};        // socketId -> { socketId, name, streamId } — every live share in the room
+  let remoteScreenStreams = {}; // socketId -> MediaStream — received screen streams
+  let focusedShareId = null;    // which share is on the big stage
+  let stageVolume = parseInt(localStorage.getItem('vw_stage_volume') || '100');
+  let shareResolution = localStorage.getItem('vw_share_res') || '1080';
+  let shareFps = parseInt(localStorage.getItem('vw_share_fps') || '30');
+  let shareOptimize = localStorage.getItem('vw_share_optimize') || 'auto';
   let selectedScreenSource = null;
   let pickerSourceType = 'screen';
   let micAcquirePromise = null; // pre-acquired mic promise (started on join click)
@@ -544,10 +550,18 @@
     pc.ontrack = (e) => {
       const stream = e.streams[0];
       if (!stream) return;
-      const isScreen = (activeScreenShare && stream.id === activeScreenShare.streamId) ||
-        e.track.kind === 'video' || stream.getVideoTracks().length > 0;
+      // In a mesh, a video track arriving from peer X is always X's screen.
+      // (System-audio tracks ride in the same stream as the video track.)
+      const isScreen = e.track.kind === 'video' || stream.getVideoTracks().length > 0 ||
+        (screenShares[socketId] && stream.id === screenShares[socketId].streamId);
       if (isScreen) {
-        attachStageStream(stream);
+        remoteScreenStreams[socketId] = stream;
+        if (!screenShares[socketId]) {
+          // Tracks can land before the socket announcement — register a placeholder
+          screenShares[socketId] = { socketId, name: peer.name || 'Someone', streamId: stream.id };
+        }
+        if (!focusedShareId) focusedShareId = socketId;
+        renderScreenShares();
         return;
       }
       peerStreams[socketId] = stream;
@@ -571,6 +585,19 @@
     return pc;
   }
 
+  function currentShareBitrate() {
+    if (lowBandwidthEnabled) return 800000;
+    // Discord-like ladder: scale with resolution × frame rate
+    const table = {
+      '720':    { 15: 1500000, 30: 2500000, 60: 3500000 },
+      '1080':   { 15: 2500000, 30: 4000000, 60: 6000000 },
+      '1440':   { 15: 4000000, 30: 6000000, 60: 8000000 },
+      'source': { 15: 4000000, 30: 6500000, 60: 9000000 }
+    };
+    const row = table[shareResolution] || table['1080'];
+    return row[shareFps] || row[30];
+  }
+
   function applyBandwidthLimit(pc) {
     pc.getSenders().forEach(sender => {
       if (!sender.track) return;
@@ -579,7 +606,11 @@
       if (sender.track.kind === 'audio') {
         params.encodings[0].maxBitrate = lowBandwidthEnabled ? 16000 : 128000;
       } else if (sender.track.kind === 'video') {
-        params.encodings[0].maxBitrate = lowBandwidthEnabled ? 600000 : 3000000; // screen share
+        params.encodings[0].maxBitrate = currentShareBitrate(); // screen share
+        // Keep resolution crisp and let the encoder drop frames first for
+        // text content; for motion content prefer smooth frame rate.
+        params.degradationPreference = (shareOptimize === 'motion' || (shareOptimize === 'auto' && shareFps >= 60))
+          ? 'maintain-framerate' : 'maintain-resolution';
       }
       sender.setParameters(params).catch(err => console.warn('Bitrate limit error:', err));
     });
@@ -697,12 +728,10 @@
       toast('Screen share is available in the desktop app only', 'error');
       return;
     }
-    if (activeScreenShare && activeScreenShare.socketId !== mySocketId) {
-      toast(`${activeScreenShare.name} is already sharing`, 'error');
-      return;
-    }
     selectedScreenSource = null;
     $('#screen-picker-share').disabled = true;
+    // Restore last-used quality choices
+
     $('#screen-picker-modal').classList.add('open');
     const audioRow = $('#picker-audio-row');
     if (audioRow) audioRow.style.display = navigator.userAgent.includes('Windows') ? 'flex' : 'none';
@@ -742,26 +771,72 @@
     }
   }
 
+  const SHARE_RESOLUTIONS = {
+    '720':  { width: 1280, height: 720 },
+    '1080': { width: 1920, height: 1080 },
+    '1440': { width: 2560, height: 1440 }
+    // 'source' = no constraint, capture native size
+  };
+
   async function startScreenShare() {
     if (!selectedScreenSource) return;
     const withAudio = !!$('#picker-share-audio')?.checked;
+    // Read + persist quality choices
+    shareResolution = $('#picker-resolution')?.value || '1080';
+    shareFps = parseInt($('#picker-fps')?.value || '30');
+    shareOptimize = $('#picker-optimize')?.value || 'auto';
+    localStorage.setItem('vw_share_res', shareResolution);
+    localStorage.setItem('vw_share_fps', String(shareFps));
+    localStorage.setItem('vw_share_optimize', shareOptimize);
+
     $('#screen-picker-modal').classList.remove('open');
     try {
       window.electronAPI.selectScreenSource(selectedScreenSource, withAudio);
+      const videoConstraints = { frameRate: { ideal: shareFps, max: shareFps } };
+      const res = SHARE_RESOLUTIONS[shareResolution];
+      if (res) {
+        videoConstraints.width = { max: res.width };
+        videoConstraints.height = { max: res.height };
+      }
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: { ideal: 30, max: 60 }, width: { max: 1920 }, height: { max: 1080 } },
+        video: videoConstraints,
         audio: withAudio
       });
       screenStream = stream;
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
-        try { videoTrack.contentHint = 'detail'; } catch (e) {}
+        const hint = shareOptimize === 'auto' ? (shareFps >= 60 ? 'motion' : 'detail') : shareOptimize;
+        try { videoTrack.contentHint = hint; } catch (e) {}
         videoTrack.onended = () => stopScreenShare(); // window closed / capture killed
       }
       // Announce first so viewers learn the stream id before tracks arrive
       socket.emit('screen-share-start', { roomId, streamId: stream.id });
     } catch (err) {
       console.error('[VoiceWave] screen share error:', err);
+      if (err && err.name !== 'NotAllowedError') {
+        toast('Could not start screen share: ' + (err.message || err.name), 'error');
+      }
+      cleanupScreenStream();
+    }
+  }
+
+  // Browser / PWA sharing — the browser shows its own source picker
+  async function startWebScreenShare() {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: shareFps, max: 60 } },
+        audio: true
+      });
+      screenStream = stream;
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        try { videoTrack.contentHint = shareFps >= 60 ? 'motion' : 'detail'; } catch (e) {}
+        videoTrack.onended = () => stopScreenShare();
+      }
+      // Announce first so viewers learn the stream id before tracks arrive
+      socket.emit('screen-share-start', { roomId, streamId: stream.id });
+    } catch (err) {
+      console.error('[VoiceWave] web screen share error:', err);
       if (err && err.name !== 'NotAllowedError') {
         toast('Could not start screen share: ' + (err.message || err.name), 'error');
       }
@@ -776,17 +851,13 @@
       screenStream.getTracks().forEach(track => peer.pc.addTrack(track, screenStream));
       applyBandwidthLimit(peer.pc);
     });
-    // Local preview (muted so the sharer doesn't hear their own system audio twice)
-    showStage(window.userName || 'You', true);
-    const video = $('#stage-video');
-    video.srcObject = screenStream;
-    video.muted = true;
-    video.play().catch(() => {});
-    $('#stage-waiting').classList.remove('show');
+    screenShares[mySocketId] = screenShares[mySocketId] ||
+      { socketId: mySocketId, name: window.userName || 'You', streamId: screenStream.id };
+    focusedShareId = mySocketId; // jump to your own preview, like Discord
     const btn = $('#btn-screen-share');
     btn.classList.add('sharing');
     $('#screen-share-label').textContent = 'Stop';
-    $('#stage-stop').style.display = 'inline-flex';
+    renderScreenShares();
     toast('You are live! 🖥️', 'success');
   }
 
@@ -801,8 +872,9 @@
     });
     cleanupScreenStream();
     if (!silent && socket && roomId) socket.emit('screen-share-stop', { roomId });
-    hideStage();
-    activeScreenShare = null;
+    delete screenShares[mySocketId];
+    if (focusedShareId === mySocketId) focusedShareId = null;
+    renderScreenShares();
   }
 
   function cleanupScreenStream() {
@@ -816,40 +888,126 @@
       btn.classList.remove('sharing');
       $('#screen-share-label').textContent = 'Share';
     }
-    const stopBtn = $('#stage-stop');
-    if (stopBtn) stopBtn.style.display = 'none';
   }
 
-  function showStage(sharerName, isLocal) {
+  // ── STAGE RENDERING (multi-stream, Discord-style) ──
+  function getShareStream(socketId) {
+    if (socketId === mySocketId) return screenStream;
+    return remoteScreenStreams[socketId] || null;
+  }
+
+  function renderScreenShares() {
+    const shares = Object.values(screenShares);
     const stage = $('#screen-stage');
+    const room = document.getElementById('room');
+
+    // Live badges on user cards
+    $$('#user-grid .user-card').forEach(card => {
+      card.classList.toggle('is-live', !!screenShares[card.dataset.socket]);
+    });
+
+    if (shares.length === 0) {
+      stage.classList.remove('active');
+      room.classList.remove('has-stage');
+      const video = $('#stage-video');
+      video.srcObject = null;
+      $('#stage-waiting').classList.remove('show');
+      $('#stage-thumbs').style.display = 'none';
+      $('#stage-thumbs').innerHTML = '';
+      if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => {});
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      focusedShareId = null;
+      return;
+    }
+
+    // Make sure something valid is focused
+    if (!focusedShareId || !screenShares[focusedShareId]) {
+      focusedShareId = shares[0].socketId;
+    }
+
     stage.classList.add('active');
-    document.getElementById('room').classList.add('has-stage');
-    $('#stage-sharer-name').textContent = isLocal ? 'You are sharing your screen' : `${sharerName}'s screen`;
-    $('#stage-waiting').classList.toggle('show', !isLocal && !$('#stage-video').srcObject);
+    room.classList.add('has-stage');
+
+    const share = screenShares[focusedShareId];
+    const isLocal = focusedShareId === mySocketId;
+    $('#stage-sharer-name').textContent = isLocal ? 'You are sharing your screen' : `${share.name}'s screen`;
+
+    const countEl = $('#stage-count');
+    if (countEl) {
+      countEl.style.display = shares.length > 1 ? 'inline-flex' : 'none';
+      countEl.textContent = `${shares.length} streams`;
+    }
+
+    // Main stage video
+    const video = $('#stage-video');
+    const stream = getShareStream(focusedShareId);
+    if (stream) {
+      if (video.srcObject !== stream) video.srcObject = stream;
+      // Own preview stays muted so system audio doesn't double up
+      video.muted = isLocal || isDeafened;
+      video.volume = stageVolume / 100;
+      video.play().catch(() => {
+        const resume = () => {
+          video.play().then(() => document.removeEventListener('click', resume)).catch(() => {});
+        };
+        document.addEventListener('click', resume);
+      });
+      $('#stage-waiting').classList.remove('show');
+    } else {
+      video.srcObject = null;
+      $('#stage-waiting').classList.add('show');
+    }
+
+    // Controls: stop only for your own share; volume only for remote audio
+    $('#stage-stop').style.display = isScreenSharing ? 'inline-flex' : 'none';
+    const volWrap = $('#stage-volume-wrap');
+    if (volWrap) volWrap.style.display = isLocal ? 'none' : 'flex';
+
+    renderStageThumbs(shares);
   }
 
-  function hideStage() {
-    const stage = $('#screen-stage');
-    stage.classList.remove('active');
-    document.getElementById('room').classList.remove('has-stage');
-    const video = $('#stage-video');
-    video.srcObject = null;
-    $('#stage-waiting').classList.remove('show');
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  }
+  function renderStageThumbs(shares) {
+    const strip = $('#stage-thumbs');
+    if (!strip) return;
+    if (shares.length < 2) {
+      strip.style.display = 'none';
+      strip.innerHTML = '';
+      return;
+    }
+    strip.style.display = 'flex';
 
-  function attachStageStream(stream) {
-    const video = $('#stage-video');
-    video.srcObject = stream;
-    video.muted = isDeafened;
-    $('#stage-waiting').classList.remove('show');
-    if (activeScreenShare) showStage(activeScreenShare.name, activeScreenShare.socketId === mySocketId);
-    else showStage('Screen share', false);
-    video.play().catch(() => {
-      const resume = () => {
-        video.play().then(() => document.removeEventListener('click', resume)).catch(() => {});
-      };
-      document.addEventListener('click', resume);
+    // Diff tiles so videos don't flicker on re-render
+    const seen = new Set();
+    shares.forEach(share => {
+      seen.add(share.socketId);
+      let tile = strip.querySelector(`[data-share="${share.socketId}"]`);
+      if (!tile) {
+        tile = document.createElement('button');
+        tile.className = 'stage-thumb';
+        tile.dataset.share = share.socketId;
+        tile.innerHTML = `
+          <video muted autoplay playsinline></video>
+          <span class="stage-thumb-live">LIVE</span>
+          <span class="stage-thumb-name"></span>
+        `;
+        tile.addEventListener('click', () => {
+          focusedShareId = tile.dataset.share;
+          renderScreenShares();
+        });
+        strip.appendChild(tile);
+      }
+      tile.querySelector('.stage-thumb-name').textContent =
+        share.socketId === mySocketId ? 'You' : share.name;
+      tile.classList.toggle('focused', share.socketId === focusedShareId);
+      const vid = tile.querySelector('video');
+      const stream = getShareStream(share.socketId);
+      if (stream && vid.srcObject !== stream) {
+        vid.srcObject = stream;
+        vid.play().catch(() => {});
+      }
+    });
+    strip.querySelectorAll('.stage-thumb').forEach(tile => {
+      if (!seen.has(tile.dataset.share)) tile.remove();
     });
   }
 
@@ -1455,16 +1613,19 @@
         createPeerConnection(p.socketId, p.name);
       }
 
-      // Resume an ongoing screen share view (someone was already live)
-      if (data.screenShare && data.screenShare.socketId !== mySocketId) {
-        activeScreenShare = data.screenShare;
-        showStage(activeScreenShare.name, false);
-      } else if (isScreenSharing && screenStream) {
+      // Resume ongoing screen shares (people were already live)
+      screenShares = {};
+      remoteScreenStreams = {};
+      focusedShareId = null;
+      const existingShares = data.screenShares || (data.screenShare ? [data.screenShare] : []);
+      existingShares.forEach(s => {
+        if (s && s.socketId !== mySocketId) screenShares[s.socketId] = s;
+      });
+      if (isScreenSharing && screenStream) {
         // We reconnected mid-share — re-announce it
         socket.emit('screen-share-start', { roomId, streamId: screenStream.id });
-      } else {
-        hideStage();
       }
+      renderScreenShares();
 
       if (window.electronAPI) {
         window.electronAPI.updateRoomState(true);
@@ -1516,6 +1677,13 @@
       UI_SOUNDS.play('leave');
       const name = peers[data.socketId]?.name || 'Someone';
       removePeerFromGrid(data.socketId);
+      // Drop any stream they were sharing
+      if (screenShares[data.socketId]) {
+        delete screenShares[data.socketId];
+        delete remoteScreenStreams[data.socketId];
+        if (focusedShareId === data.socketId) focusedShareId = null;
+        renderScreenShares();
+      }
       toast(`${name} left`, 'info');
     });
 
@@ -1702,36 +1870,39 @@
       toast(`${name} played ${SOUNDS[data.soundId] || data.soundId}`, 'info');
     });
 
-    // 🖥️ Screen share events
+    // 🖥️ Screen share events (multiple simultaneous streams)
     socket.on('screen-share-started', (data) => {
-      activeScreenShare = data;
+      screenShares[data.socketId] = data;
       if (data.socketId === mySocketId) {
         // Server approved our share — start pushing tracks (guard against
         // double-adds after a reconnect where tracks were re-added already)
         if (!isScreenSharing) beginBroadcastingScreen();
+        else renderScreenShares();
         return;
       }
-      showStage(data.name, false);
-      toast(`${data.name} started sharing their screen`, 'info');
+      renderScreenShares();
+      toast(`${data.name} started streaming 🖥️`, 'info');
     });
 
     socket.on('screen-share-stopped', (data) => {
-      if (activeScreenShare && activeScreenShare.socketId !== mySocketId) {
-        toast('Screen share ended', 'info');
+      if (data.socketId !== mySocketId && screenShares[data.socketId]) {
+        toast(`${screenShares[data.socketId].name}'s stream ended`, 'info');
       }
-      activeScreenShare = null;
-      if (!isScreenSharing) hideStage();
+      delete screenShares[data.socketId];
+      delete remoteScreenStreams[data.socketId];
+      if (focusedShareId === data.socketId) focusedShareId = null;
+      renderScreenShares();
     });
 
     socket.on('screen-share-denied', (data) => {
-      toast(`${data.name} is already sharing — only one stream at a time`, 'error');
+      const msg = data && data.reason === 'limit'
+        ? `Stream limit reached (${data.max} at once) — try again when someone stops`
+        : `${data && data.name ? data.name + ' is already sharing' : 'Screen share denied'}`;
+      toast(msg, 'error');
       cleanupScreenStream();
-      // Keep the other person's live stage visible if there is one
-      if (activeScreenShare && activeScreenShare.socketId !== mySocketId) {
-        showStage(activeScreenShare.name, false);
-      } else {
-        hideStage();
-      }
+      delete screenShares[mySocketId];
+      if (focusedShareId === mySocketId) focusedShareId = null;
+      renderScreenShares();
     });
 
     socket.on('kicked', () => {
@@ -2023,7 +2194,7 @@
 
     // Also silence screen share audio (unless it's our own muted preview)
     const stageVideo = $('#stage-video');
-    if (stageVideo && !isScreenSharing) stageVideo.muted = isDeafened;
+    if (stageVideo && focusedShareId !== mySocketId) stageVideo.muted = isDeafened;
 
     const btn = $('#btn-deafen');
     btn.classList.toggle('muted-state', isDeafened);
@@ -2108,8 +2279,10 @@
     peers = {};
     peerStreams = {};
     remoteAnalysers = {};
-    activeScreenShare = null;
-    hideStage();
+    screenShares = {};
+    remoteScreenStreams = {};
+    focusedShareId = null;
+    renderScreenShares();
     setMicBanner(false);
     if (localStream) localStream.getTracks().forEach(t => t.stop());
     localStream = null;
@@ -2445,13 +2618,16 @@
       }
     });
 
-    // ── SCREEN SHARE TRIGGERS (desktop app only) ──
+    // ── SCREEN SHARE TRIGGERS (desktop app has a custom picker; browsers use the native one) ──
     const screenShareBtn = $('#btn-screen-share');
-    if (window.electronAPI && window.electronAPI.isElectron && screenShareBtn) {
+    const canShareScreen = (window.electronAPI && window.electronAPI.isElectron) ||
+      (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+    if (screenShareBtn && canShareScreen) {
       screenShareBtn.style.display = 'flex';
       screenShareBtn.addEventListener('click', () => {
         if (isScreenSharing) stopScreenShare();
-        else openScreenPicker();
+        else if (window.electronAPI && window.electronAPI.isElectron) openScreenPicker();
+        else startWebScreenShare();
       });
     }
 
@@ -2483,6 +2659,32 @@
     $('#stage-video')?.addEventListener('dblclick', () => {
       $('#stage-fullscreen')?.click();
     });
+
+    // Picture-in-Picture — keep watching a stream while using other apps
+    $('#stage-pip')?.addEventListener('click', async () => {
+      const video = $('#stage-video');
+      try {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        } else if (video && video.srcObject && video.requestPictureInPicture) {
+          await video.requestPictureInPicture();
+        }
+      } catch (err) {
+        console.warn('[VoiceWave] PiP error:', err);
+      }
+    });
+
+    // Per-stream volume (remote shares only; own preview is always muted)
+    const stageVolSlider = $('#stage-volume');
+    if (stageVolSlider) {
+      stageVolSlider.value = stageVolume;
+      stageVolSlider.addEventListener('input', (e) => {
+        stageVolume = parseInt(e.target.value);
+        localStorage.setItem('vw_stage_volume', String(stageVolume));
+        const video = $('#stage-video');
+        if (video) video.volume = stageVolume / 100;
+      });
+    }
 
     // Mic retry banner
     $('#mic-banner-retry')?.addEventListener('click', retryMic);
@@ -2804,6 +3006,9 @@
       $('#settings-modal').classList.add('open');
     });
     $('#settings-close').addEventListener('click', () => {
+      $('#settings-modal').classList.remove('open');
+    });
+    $('#settings-done')?.addEventListener('click', () => {
       $('#settings-modal').classList.remove('open');
     });
 
