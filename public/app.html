@@ -13,7 +13,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.66">
+<link rel="stylesheet" href="/app.css?v=1.0.68">
 <!-- Consolidated Styles moved to app.css -->
 </head>
 <body>
@@ -224,6 +224,7 @@
           <span class="live-badge"><span class="live-dot"></span>LIVE</span>
           <span class="stage-sharer" id="stage-sharer-name">Screen share</span>
           <span class="stage-count" id="stage-count" style="display:none;"></span>
+          <span class="stage-watchers" id="stage-watchers" title="People watching this stream" style="display:none;"></span>
           <div class="stage-actions">
             <div class="stage-volume-wrap" id="stage-volume-wrap" title="Stream volume">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
@@ -685,7 +686,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.66';
+  window.APP_VERSION = '1.0.68';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -731,6 +732,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.66"></script>
+<script src="/app.js?v=1.0.68"></script>
 </body>
 </html>

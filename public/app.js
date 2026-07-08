@@ -222,6 +222,8 @@
   let screenShares = {};        // socketId -> { socketId, name, streamId } — every live share in the room
   let remoteScreenStreams = {}; // socketId -> MediaStream — received screen streams
   let focusedShareId = null;    // which share is on the big stage
+  let watcherCounts = {};       // sharerSocketId -> live viewer count (Discord Go-Live style)
+  let lastWatchingEmit = undefined; // last focusedShareId we told the server we're watching
   let stageVolume = parseInt(localStorage.getItem('vw_stage_volume') || '100');
   let shareResolution = localStorage.getItem('vw_share_res') || '1080';
   let shareFps = parseInt(localStorage.getItem('vw_share_fps') || '30');
@@ -709,6 +711,20 @@
       const isScreen = e.track.kind === 'video' || stream.getVideoTracks().length > 0 ||
         (screenShares[socketId] && stream.id === screenShares[socketId].streamId);
       if (isScreen) {
+        // Chromium's receiver-side jitter buffer defaults to a smoothness-
+        // biased target (larger for 'detail'/'motion'-hinted content, which
+        // the sender already sets on screen-share tracks) — that's the
+        // actual source of "screen share feels delayed" complaints, not
+        // encoding or bitrate. Ask for the lowest-latency playout target on
+        // this receiver instead. Both the video track's ontrack and the
+        // paired system-audio track's ontrack pass through this same
+        // isScreen branch (they share one MediaStream), so one hint here
+        // covers both — if only video were zeroed, Chromium's AV-sync
+        // logic would just re-delay it to match audio's higher target.
+        // Mic/voice-chat receivers below are intentionally left untouched.
+        if ('playoutDelayHint' in e.receiver) {
+          try { e.receiver.playoutDelayHint = 0; } catch (err) {}
+        }
         remoteScreenStreams[socketId] = stream;
         if (!screenShares[socketId]) {
           // Tracks can land before the socket announcement — register a placeholder
@@ -1115,6 +1131,14 @@
       countEl.textContent = `${shares.length} streams`;
     }
 
+    // Live viewer count (Discord Go-Live style) — tell the server who we're
+    // watching only when focus actually changes, not on every re-render.
+    if (lastWatchingEmit !== focusedShareId && socket && roomId) {
+      socket.emit('watching-share', { roomId, sharerSocketId: focusedShareId });
+      lastWatchingEmit = focusedShareId;
+    }
+    updateWatcherBadge();
+
     // Main stage video
     const video = $('#stage-video');
     const stream = getShareStream(focusedShareId);
@@ -1141,6 +1165,14 @@
     if (volWrap) volWrap.style.display = isLocal ? 'none' : 'flex';
 
     renderStageThumbs(shares);
+  }
+
+  function updateWatcherBadge() {
+    const el = $('#stage-watchers');
+    if (!el) return;
+    const count = watcherCounts[focusedShareId] || 0;
+    el.style.display = focusedShareId ? 'inline-flex' : 'none';
+    el.textContent = `👁 ${count}`;
   }
 
   function renderStageThumbs(shares) {
@@ -1396,8 +1428,17 @@
     `;
     popout.querySelector('.upo-avatar-wrap').appendChild(avatarClone);
 
-    const rect = cardEl.getBoundingClientRect();
     popout.classList.add('open');
+
+    // On narrow screens the popout becomes a fixed bottom sheet via CSS —
+    // skip computed inline positioning so those rules aren't fought/overridden.
+    if (window.innerWidth <= 640) {
+      popout.style.left = '';
+      popout.style.top = '';
+      return;
+    }
+
+    const rect = cardEl.getBoundingClientRect();
     const popoutRect = popout.getBoundingClientRect();
     let left = rect.left + rect.width / 2 - popoutRect.width / 2;
     left = Math.max(10, Math.min(left, window.innerWidth - popoutRect.width - 10));
@@ -2177,8 +2218,15 @@
       }
       delete screenShares[data.socketId];
       delete remoteScreenStreams[data.socketId];
+      delete watcherCounts[data.socketId];
       if (focusedShareId === data.socketId) focusedShareId = null;
+      if (lastWatchingEmit === data.socketId) lastWatchingEmit = undefined;
       renderScreenShares();
+    });
+
+    socket.on('watcher-count-updated', (data) => {
+      watcherCounts[data.sharerSocketId] = data.count;
+      if (focusedShareId === data.sharerSocketId) updateWatcherBadge();
     });
 
     socket.on('screen-share-denied', (data) => {
@@ -3427,11 +3475,23 @@
     // Profile popout — click any avatar (own or peer's) in the grid
     $('#user-grid')?.addEventListener('click', (e) => {
       const avatar = e.target.closest('.user-avatar');
-      if (!avatar) return;
-      const card = avatar.closest('.user-card');
-      if (!card) return;
-      e.stopPropagation();
-      openProfilePopout(card);
+      if (avatar) {
+        const card = avatar.closest('.user-card');
+        if (!card) return;
+        e.stopPropagation();
+        openProfilePopout(card);
+        return;
+      }
+      // Click anywhere else on a LIVE card focuses that person's stream on
+      // the stage — avatar stays reserved for the profile popout above.
+      const liveCard = e.target.closest('.user-card.is-live');
+      if (liveCard && !e.target.closest('.user-actions')) {
+        const socketId = liveCard.dataset.socket;
+        if (screenShares[socketId]) {
+          focusedShareId = socketId;
+          renderScreenShares();
+        }
+      }
     });
     document.addEventListener('click', (e) => {
       if (!e.target.closest('#user-profile-popout') && !e.target.closest('.user-avatar')) {

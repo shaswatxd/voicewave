@@ -1733,6 +1733,15 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
   font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em;
   flex-shrink: 0;
 }
+.stage-watchers {
+  display: inline-flex; align-items: center;
+  padding: 3px 9px;
+  background: rgba(255,255,255,0.06);
+  color: #d1d5db;
+  border-radius: 6px;
+  font-size: 0.66rem; font-weight: 600;
+  flex-shrink: 0;
+}
 .stage-volume-wrap {
   display: flex; align-items: center; gap: 6px;
   padding: 0 8px;
@@ -1811,7 +1820,8 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
   z-index: 5;
   animation: liveDotPulse 1.6s ease-in-out infinite;
 }
-.user-card.is-live { border-color: rgba(242,63,67,0.45); }
+.user-card.is-live { border-color: rgba(242,63,67,0.45); cursor: pointer; }
+.user-card.is-live:hover { box-shadow: 0 0 22px rgba(242,63,67,0.18); transform: translateY(-2px); }
 
 @media (max-width: 768px) {
   .stage-thumb { width: 110px; }
@@ -1969,5 +1979,23 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
 .msg-action-icon-btn:active, .action-btn:active { transform: scale(0.9); }
 
 @media (max-width: 640px) {
-  .user-profile-popout { width: calc(100vw - 32px); }
+  /* Bottom-sheet pattern (Discord-mobile style) for the one popover that's
+     JS-positioned relative to wherever it was tapped — on a phone that
+     anchoring reads oddly; anchoring to the bottom edge instead is more
+     native-feeling and impossible to clip off-screen. */
+  .user-profile-popout {
+    left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 18px 18px 0 0;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    transform: translateY(100%);
+  }
+  .user-profile-popout.open { transform: translateY(0); }
+
+  /* Bigger tap targets for touch — mention/emoji lists sit inside the
+     already-full-screen mobile chat panel, so they don't need to become
+     fixed sheets themselves, just comfortably tappable. */
+  .mention-item { padding: 12px 16px; font-size: 0.9rem; }
+  .emoji-picker-item { width: 38px; height: 38px; font-size: 1.25rem; }
 }

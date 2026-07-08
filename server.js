@@ -208,7 +208,8 @@ io.on('connection', (socket) => {
       history: room.history, // Send last 50 messages
       polls: room.polls, // Send active polls
       pinned: room.pinned, // Send pinned messages
-      screenShares: Object.values(room.screenShares || {}) // Ongoing screen shares, if any
+      // Ongoing screen shares, if any — strip the server-only watchers Set
+      screenShares: Object.values(room.screenShares || {}).map(({ socketId, name, streamId }) => ({ socketId, name, streamId }))
     });
 
     socket.to(roomId).emit('peer-joined', {
@@ -257,8 +258,8 @@ io.on('connection', (socket) => {
       socket.emit('screen-share-denied', { reason: 'limit', max: MAX_SCREEN_SHARES });
       return;
     }
-    room.screenShares[socket.id] = { socketId: socket.id, name: socket.userName, streamId };
-    io.to(roomId).emit('screen-share-started', room.screenShares[socket.id]);
+    room.screenShares[socket.id] = { socketId: socket.id, name: socket.userName, streamId, watchers: new Set() };
+    io.to(roomId).emit('screen-share-started', { socketId: socket.id, name: socket.userName, streamId });
   });
 
   socket.on('screen-share-stop', ({ roomId }) => {
@@ -266,6 +267,29 @@ io.on('connection', (socket) => {
     if (!room || !room.screenShares || !room.screenShares[socket.id]) return;
     delete room.screenShares[socket.id];
     io.to(roomId).emit('screen-share-stopped', { socketId: socket.id });
+  });
+
+  // Live viewer count ("N watching", Discord Go-Live style) — a viewer only
+  // watches one stream at a time, so switching focus moves them, it doesn't add up.
+  socket.on('watching-share', ({ roomId, sharerSocketId }) => {
+    const room = rooms.get(roomId);
+    if (!room || !room.screenShares) return;
+    const touchedSharers = new Set();
+    Object.values(room.screenShares).forEach(share => {
+      if (share.watchers.has(socket.id) && share.socketId !== sharerSocketId) {
+        share.watchers.delete(socket.id);
+        touchedSharers.add(share.socketId);
+      }
+    });
+    const target = room.screenShares[sharerSocketId];
+    if (target && target.socketId !== socket.id) {
+      target.watchers.add(socket.id);
+      touchedSharers.add(sharerSocketId);
+    }
+    touchedSharers.forEach(sid => {
+      const share = room.screenShares[sid];
+      if (share) io.to(roomId).emit('watcher-count-updated', { sharerSocketId: sid, count: share.watchers.size });
+    });
   });
 
   socket.on('user-muted', ({ roomId, muted }) => {
@@ -491,6 +515,7 @@ io.on('connection', (socket) => {
         targetSocket.leave(roomId);
         targetSocket.roomId = null;
       }
+      clearWatcherFromShares(room, roomId, targetId);
       if (room.screenShares && room.screenShares[targetId]) {
         delete room.screenShares[targetId];
         io.to(roomId).emit('screen-share-stopped', { socketId: targetId });
@@ -536,6 +561,17 @@ io.on('connection', (socket) => {
     console.log(`[Disconnect] ${socket.id}`);
   });
 
+  // A departing socket might be watching someone else's stream — drop it
+  // from that share's watcher count too, not just clean up its own share.
+  function clearWatcherFromShares(room, roomId, socketId) {
+    if (!room.screenShares) return;
+    Object.values(room.screenShares).forEach(share => {
+      if (share.watchers && share.watchers.delete(socketId)) {
+        io.to(roomId).emit('watcher-count-updated', { sharerSocketId: share.socketId, count: share.watchers.size });
+      }
+    });
+  }
+
   function handleLeave(sock, roomId) {
     const room = rooms.get(roomId);
     if (!room) return;
@@ -543,6 +579,8 @@ io.on('connection', (socket) => {
     room.users.delete(sock.id);
     sock.leave(roomId);
     sock.roomId = null;
+
+    clearWatcherFromShares(room, roomId, sock.id);
 
     // Clear screen share if the sharer left
     if (room.screenShares && room.screenShares[sock.id]) {
