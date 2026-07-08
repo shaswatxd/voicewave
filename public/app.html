@@ -12,7 +12,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.57">
+<link rel="stylesheet" href="/app.css?v=1.0.59">
 <!-- Consolidated Styles moved to app.css -->
 </head>
 <body>
@@ -199,6 +199,9 @@
           <div class="pd-list" id="pd-list"></div>
         </div>
       </div>
+      <button class="btn-icon" id="btn-shortcuts-help" title="Keyboard Shortcuts">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+      </button>
       <button class="btn-icon" id="btn-settings" title="Settings">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
@@ -279,6 +282,7 @@
         <span id="btn-cancel-reply" style="cursor:pointer; font-weight:bold; font-size:0.95rem; padding:2px 6px;">✕</span>
       </div>
       <div class="chat-input-area">
+        <div class="mention-dropdown" id="mention-dropdown" style="display:none;"></div>
         <div class="emoji-bar" id="emoji-bar">
           <button class="emoji-btn" data-emoji="😂">😂</button>
           <button class="emoji-btn" data-emoji="❤️">❤️</button>
@@ -290,7 +294,9 @@
           <button class="emoji-btn" data-emoji="🎉">🎉</button>
           <button class="emoji-btn" data-emoji="👀">👀</button>
           <button class="emoji-btn" data-emoji="💯">💯</button>
+          <button class="emoji-btn emoji-more-btn" id="btn-emoji-more" title="More emoji">➕</button>
         </div>
+        <div class="emoji-picker" id="emoji-picker" style="display:none;"></div>
         <div class="chat-input-row">
           <input type="text" id="chat-input" placeholder="Send a message..." maxlength="500">
           <label class="btn-icon" title="Attach file" style="cursor:pointer;margin:0;">
@@ -644,6 +650,29 @@
   </div>
 </div>
 
+<!-- USER PROFILE POPOUT -->
+<div class="user-profile-popout" id="user-profile-popout"></div>
+
+<!-- KEYBOARD SHORTCUTS MODAL -->
+<div class="modal" id="shortcuts-modal">
+  <div class="modal-card">
+    <h3>⌨️ Keyboard Shortcuts</h3>
+    <p>Speed things up without touching the mouse</p>
+    <div class="shortcuts-list">
+      <div class="shortcut-row"><span>Toggle Mute</span><kbd>M</kbd></div>
+      <div class="shortcut-row"><span>Toggle Deafen</span><kbd>D</kbd></div>
+      <div class="shortcut-row"><span>Toggle Chat</span><kbd>C</kbd></div>
+      <div class="shortcut-row"><span>Push-to-Talk (hold)</span><kbd>Space</kbd></div>
+      <div class="shortcut-row"><span>Send Message</span><kbd>Enter</kbd></div>
+      <div class="shortcut-row"><span>Mention Someone</span><kbd>@</kbd></div>
+      <div class="shortcut-row"><span>Fullscreen Stream</span><kbd>Double-click video</kbd></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="shortcuts-close">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- FULLSCREEN IMAGE LIGHTBOX -->
 <div class="modal" id="lightbox-modal" style="background:rgba(0,0,0,0.92); z-index:2000;">
   <div style="position:relative; max-width:90%; max-height:90%; display:flex; align-items:center; justify-content:center; flex-direction:column;">
@@ -654,7 +683,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.57';
+  window.APP_VERSION = '1.0.59';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -687,6 +716,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.57"></script>
+<script src="/app.js?v=1.0.59"></script>
 </body>
 </html>

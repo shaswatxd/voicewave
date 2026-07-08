@@ -13,6 +13,38 @@
   const SVG_AUDIO = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
   const SVG_MUTE = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`;
 
+  // Curated static set — no external emoji API/CDN, keeps the app fully
+  // offline-friendly and CSP-free.
+  const EMOJI_CATEGORIES = {
+    'Smileys': ['😀','😁','😂','🤣','😊','😇','🙂','😉','😍','🥰','😘','😜','🤪','😎','🥳','😏','😴','🤯','🥺','😭','😤','😡','🤔','🤫','🙄','😬','🤐','😷','🤒','🥶'],
+    'Gestures': ['👍','👎','👏','🙌','🙏','💪','🤝','👋','✌️','🤞','🤟','🤙','👌','✊','🫡','🤌','👉','👈','☝️','🖐️'],
+    'Hearts': ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','💔','💕','💞','💗','💖','💘','😻'],
+    'Objects': ['🔥','✨','🎉','🎊','💯','⭐','🌟','💤','💡','🎮','🎧','📷','🏆','🎵','🎤','⚡','💀','👻','🤖','🎁'],
+    'Animals': ['🐶','🐱','🦊','🐻','🐼','🐨','🐸','🐵','🦁','🐯','🐷','🐔','🦄','🐝','🦋']
+  };
+
+  const STATUS_MAP = {
+    online: { color: '#22c55e', text: 'Online' },
+    idle: { color: '#eab308', text: 'Idle' },
+    dnd: { color: '#ef4444', text: 'Do Not Disturb' }
+  };
+
+  // Shared admin quick-actions (transfer host / kick / force-mute) — used by
+  // both the user-card hover actions and the profile popout, so clicks land
+  // on the same document-level [data-*] delegated handlers either way.
+  function buildAdminActionsHtml(socketId, muted, forceMuted) {
+    const hostBtnHtml = `<button class="action-btn" data-transfer="${socketId}" title="Transfer Host" style="margin-right:4px;">${SVG_CROWN}</button>`;
+    const muteAction = (muted && forceMuted) ? 'Unmute' : 'Mute';
+    const muteSymbol = (muted && forceMuted) ? SVG_MUTE : SVG_AUDIO;
+    return `
+      <div class="user-actions" style="display:flex; gap:4px;">
+        ${hostBtnHtml}
+        <button class="action-btn btn-kick" data-kick="${socketId}" title="Kick user" style="margin-right:4px;">${SVG_KICK}</button>
+        <button class="action-btn btn-mute" data-force-mute="${socketId}" title="${muteAction} user">${muteSymbol}</button>
+      </div>
+    `;
+  }
+
   const AVATAR_COLORS = [
     'linear-gradient(135deg,#22d3ee,#06b6d4)',
     'linear-gradient(135deg,#a855f7,#7c3aed)',
@@ -70,6 +102,14 @@
           gain.gain.exponentialRampToValueAtTime(0.005 * volumeMultiplier, now + 0.22);
           osc.start();
           osc.stop(now + 0.22);
+        } else if (type === 'mention') {
+          osc.frequency.setValueAtTime(880, now);
+          osc.frequency.setValueAtTime(1108, now + 0.09);
+          osc.frequency.setValueAtTime(1318, now + 0.18);
+          gain.gain.setValueAtTime(0.09 * volumeMultiplier, now);
+          gain.gain.exponentialRampToValueAtTime(0.005 * volumeMultiplier, now + 0.4);
+          osc.start();
+          osc.stop(now + 0.4);
         }
       } catch (e) {
         console.warn('Web Audio Sound failed:', e);
@@ -83,6 +123,16 @@
   let micGainNode = null;
   let analyserNode = null;
   let masterGainNode = null;
+  // ── Processed-mic pipeline (real gain + noise gate that peers actually hear) ──
+  let micSourceNode = null;
+  let noiseGateNode = null;
+  let micDestinationNode = null;
+  let processedMicTrack = null;
+  let usingWorkletGate = false;
+  let audioWorkletModulePromise = null;
+  let fallbackGateAnalyser = null;
+  let fallbackGateInterval = null;
+  let fallbackGateThreshold = 0.05;
   let peers = {};
   let peerStreams = {};
   let peerForceMuted = {};
@@ -394,7 +444,7 @@
     const deviceId = $('#input-device')?.value;
     const ok = await getMediaStream(deviceId || undefined);
     if (ok && localStream) {
-      setupAudioProcessing();
+      await setupAudioProcessing();
       enumerateDevices();
       await addStreamToPeers();
       if (socket && roomId) socket.emit('user-muted', { roomId, muted: isMuted });
@@ -435,28 +485,122 @@
     }
   }
 
-  function setupAudioProcessing() {
-    if (!localStream) return;
-    audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
-    if (audioContext.state === 'suspended') {
-      audioContext.resume().catch(e => console.warn('[VoiceWave] AudioContext resume error:', e));
+  // Maps the #noise-threshold slider (5-40, same domain as the visual RMS
+  // meter) to a dB range, then to linear amplitude, so one control drives
+  // both the existing speaking-indicator AND the real outgoing gate.
+  function noiseThresholdToLinear(sliderValue) {
+    const v = parseFloat(sliderValue);
+    const db = -50 + ((v - 5) / (40 - 5)) * (-18 - -50); // 5→-50dBFS, 40→-18dBFS
+    return Math.pow(10, db / 20);
+  }
+
+  function teardownMicPipeline() {
+    if (fallbackGateInterval) { clearInterval(fallbackGateInterval); fallbackGateInterval = null; }
+    [micSourceNode, micGainNode, analyserNode, noiseGateNode, fallbackGateAnalyser, micDestinationNode].forEach(node => {
+      if (node) { try { node.disconnect(); } catch (e) {} }
+    });
+    if (processedMicTrack) { try { processedMicTrack.stop(); } catch (e) {} }
+    micSourceNode = null;
+    noiseGateNode = null;
+    fallbackGateAnalyser = null;
+    micDestinationNode = null;
+    processedMicTrack = null;
+  }
+
+  async function createNoiseGateNode(ctx) {
+    try {
+      if (!ctx.audioWorklet) throw new Error('AudioWorklet unsupported');
+      if (!audioWorkletModulePromise) {
+        audioWorkletModulePromise = ctx.audioWorklet.addModule('/audio-gate-worklet.js');
+      }
+      await audioWorkletModulePromise;
+      const node = new AudioWorkletNode(ctx, 'noise-gate-processor', {
+        numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1, channelCountMode: 'explicit'
+      });
+      usingWorkletGate = true;
+      return node;
+    } catch (e) {
+      console.warn('[VoiceWave] AudioWorklet gate unavailable, using fallback gate:', e);
+      usingWorkletGate = false;
+      audioWorkletModulePromise = null;
+      return createFallbackGateNode(ctx);
     }
-    const source = audioContext.createMediaStreamSource(localStream);
+  }
 
-    micGainNode = audioContext.createGain();
+  function createFallbackGateNode(ctx) {
+    const gateGainNode = ctx.createGain();
+    gateGainNode.gain.value = 1;
+    fallbackGateAnalyser = ctx.createAnalyser();
+    fallbackGateAnalyser.fftSize = 512;
+    micGainNode.connect(fallbackGateAnalyser); // side-chain tap, not in the main signal path
+
+    const data = new Float32Array(fallbackGateAnalyser.fftSize);
+    let currentGain = 1;
+    fallbackGateInterval = setInterval(() => {
+      fallbackGateAnalyser.getFloatTimeDomainData(data);
+      let sumSquares = 0;
+      for (let i = 0; i < data.length; i++) sumSquares += data[i] * data[i];
+      const rms = Math.sqrt(sumSquares / data.length);
+      const target = rms > fallbackGateThreshold ? 1 : 0;
+      const timeConstant = target > currentGain ? 0.01 : 0.15; // fast open, slow close
+      currentGain = target;
+      gateGainNode.gain.setTargetAtTime(target, ctx.currentTime, timeConstant);
+    }, 20);
+
+    return gateGainNode;
+  }
+
+  function applyNoiseThreshold(sliderValue) {
+    const linear = noiseThresholdToLinear(sliderValue);
+    fallbackGateThreshold = linear;
+    if (usingWorkletGate && noiseGateNode) {
+      noiseGateNode.parameters.get('threshold').value = linear;
+    }
+  }
+
+  async function setupAudioProcessing() {
+    if (!localStream) return;
+    teardownMicPipeline();
+    const ctx = ensureAudioContext();
+
+    micSourceNode = ctx.createMediaStreamSource(localStream);
+
+    micGainNode = ctx.createGain();
     micGainNode.gain.value = $('#mic-gain') ? ($('#mic-gain').value / 100) : 1;
+    micGainNode.channelCount = 1;
+    micGainNode.channelCountMode = 'explicit';
 
-    analyserNode = audioContext.createAnalyser();
+    analyserNode = ctx.createAnalyser();
     analyserNode.fftSize = 256;
     analyserNode.smoothingTimeConstant = 0.8;
 
-    source.connect(micGainNode);
-    micGainNode.connect(analyserNode);
+    micSourceNode.connect(micGainNode);
+    micGainNode.connect(analyserNode); // unchanged: local UI level-meter tap
 
-    masterGainNode = audioContext.createGain();
-    masterGainNode.gain.value = $('#master-volume') ? ($('#master-volume').value / 100) : 1;
+    noiseGateNode = await createNoiseGateNode(ctx);
+    micGainNode.connect(noiseGateNode);
+
+    micDestinationNode = ctx.createMediaStreamDestination();
+    noiseGateNode.connect(micDestinationNode);
+    processedMicTrack = micDestinationNode.stream.getAudioTracks()[0];
+
+    applyNoiseThreshold($('#noise-threshold') ? $('#noise-threshold').value : 12);
+
+    if (!masterGainNode) {
+      masterGainNode = ctx.createGain();
+      masterGainNode.gain.value = $('#master-volume') ? ($('#master-volume').value / 100) : 1;
+    }
 
     startVisualizer();
+  }
+
+  // The track peers actually receive — the processed one when ready,
+  // otherwise the raw device track (e.g. pipeline still initializing).
+  function getOutgoingMicTrack() {
+    return processedMicTrack || (localStream ? localStream.getAudioTracks()[0] : null);
+  }
+  function getOutgoingMicStream() {
+    return micDestinationNode ? micDestinationNode.stream : localStream;
   }
 
   function applySpeakingLevel(card, rms, threshold) {
@@ -517,8 +661,10 @@
     peers[socketId] = peer;
 
     let addedTracks = 0;
-    if (localStream) {
-      localStream.getTracks().forEach(track => { pc.addTrack(track, localStream); addedTracks++; });
+    const outgoingMicTrack = getOutgoingMicTrack();
+    if (outgoingMicTrack) {
+      pc.addTrack(outgoingMicTrack, getOutgoingMicStream());
+      addedTracks++;
     }
     if (isScreenSharing && screenStream) {
       screenStream.getTracks().forEach(track => { pc.addTrack(track, screenStream); addedTracks++; });
@@ -618,22 +764,23 @@
 
   async function addStreamToPeers() {
     if (!localStream) return;
+    const track = getOutgoingMicTrack();
+    const stream = getOutgoingMicStream();
     for (const peer of Object.values(peers)) {
       const pc = peer.pc;
       const hasAudioSender = pc.getSenders().some(s => s.track && s.track.kind === 'audio');
       if (hasAudioSender) continue;
-      // Reuse the recvonly transceiver when possible, otherwise add fresh tracks
-      const track = localStream.getAudioTracks()[0];
+      // Reuse the recvonly transceiver when possible, otherwise add a fresh track
       const idleTx = pc.getTransceivers().find(t => t.receiver.track && t.receiver.track.kind === 'audio' && !t.sender.track);
       if (idleTx && track) {
         try {
           await idleTx.sender.replaceTrack(track);
           idleTx.direction = 'sendrecv';
         } catch (e) {
-          pc.addTrack(track, localStream);
+          pc.addTrack(track, stream);
         }
-      } else {
-        localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+      } else if (track) {
+        pc.addTrack(track, stream);
       }
       applyBandwidthLimit(pc);
     }
@@ -1105,32 +1252,11 @@
       ? `<div class="user-avatar" style="background:${getAvatarColor(name)};"><img src="${escapeHtml(parsed.url)}" alt=""></div>`
       : `<div class="user-avatar ${accentClass}">${escapeHtml(initial)}</div>`;
 
-    let muteBtnHtml = '';
-    const iAmCreator = isCreatorLocal();
-    const isAdmin = iAmCreator;
+    const muteBtnHtml = (!isLocal && isCreatorLocal())
+      ? buildAdminActionsHtml(socketId, muted, forceMuted)
+      : '';
 
-    if (!isLocal && isAdmin) {
-      const hostBtnHtml = `<button class="action-btn" data-transfer="${socketId}" title="Transfer Host" style="margin-right:4px;">${SVG_CROWN}</button>`;
-      const muteAction = (muted && forceMuted) ? 'Unmute' : 'Mute';
-      const muteSymbol = (muted && forceMuted) ? SVG_MUTE : SVG_AUDIO;
-
-      muteBtnHtml = `
-        <div class="user-actions" style="display:flex; gap:4px;">
-          ${hostBtnHtml}
-          <button class="action-btn btn-kick" data-kick="${socketId}" title="Kick user" style="margin-right:4px;">${SVG_KICK}</button>
-          <button class="action-btn btn-mute" data-force-mute="${socketId}" title="${muteAction} user">${muteSymbol}</button>
-        </div>
-      `;
-    } else if (!isLocal) {
-      muteBtnHtml = '';
-    }
-
-    const statusMap = {
-      online: { color: '#22c55e', text: 'Online' },
-      idle: { color: '#eab308', text: 'Idle' },
-      dnd: { color: '#ef4444', text: 'Do Not Disturb' }
-    };
-    const s = statusMap[status] || statusMap.online;
+    const s = STATUS_MAP[status] || STATUS_MAP.online;
 
     const qualityHtml = isLocal ? '' : `
       <div class="connection-quality good" title="Ping: Checking...">
@@ -1208,6 +1334,61 @@
     const count = $('#user-grid').querySelectorAll('.user-card:not(.leaving)').length;
     $('#participant-count').textContent = count;
     updateParticipantsDropdown();
+  }
+
+  // ── USER PROFILE POPOUT ── reads straight from the already-rendered card
+  // (avatar, status dot, badges) so there's no re-derivation/duplication of
+  // avatar-parsing logic — just clone what's already correct in the DOM.
+  function openProfilePopout(cardEl) {
+    const socketId = cardEl.dataset.socket;
+    const name = cardEl.dataset.name;
+    const isLocalUser = socketId === mySocketId;
+    const popout = $('#user-profile-popout');
+
+    const avatarClone = cardEl.querySelector('.user-avatar').cloneNode(true);
+    avatarClone.classList.add('upo-avatar-img');
+    const isAdminUser = !!cardEl.querySelector('.admin-badge:not([style*="168,85,247"])');
+    const isModUser = !!cardEl.querySelector('.admin-badge[style*="168,85,247"]');
+    const statusColor = cardEl.querySelector('.status-dot')?.style.background || '#22c55e';
+    const statusTextEl = cardEl.querySelector('.status-text-display');
+    const isMuted = cardEl.classList.contains('muted');
+    const forceMuted = !!peerForceMuted[socketId];
+
+    const roleBadge = isAdminUser
+      ? '<span class="status-icon admin-badge">Admin</span>'
+      : isModUser
+        ? '<span class="status-icon admin-badge" style="background:rgba(168,85,247,0.15); color:#a855f7; border-color:rgba(168,85,247,0.2);">Mod</span>'
+        : '';
+
+    const actionsHtml = (!isLocalUser && isCreatorLocal()) ? buildAdminActionsHtml(socketId, isMuted, forceMuted) : '';
+
+    popout.innerHTML = `
+      <div class="upo-header">
+        <div class="upo-avatar-wrap"></div>
+        <div class="upo-name">${escapeHtml(name)}${isLocalUser ? ' (You)' : ''}</div>
+        <div class="upo-badges">
+          ${roleBadge}
+          ${isMuted ? '<span class="status-icon" style="color:#ef4444;">Muted</span>' : ''}
+        </div>
+        <div class="upo-status"><span class="status-dot" style="background:${statusColor};"></span>${statusTextEl ? escapeHtml(statusTextEl.title) : ''}</div>
+      </div>
+      ${actionsHtml ? `<div class="upo-actions">${actionsHtml}</div>` : ''}
+    `;
+    popout.querySelector('.upo-avatar-wrap').appendChild(avatarClone);
+
+    const rect = cardEl.getBoundingClientRect();
+    popout.classList.add('open');
+    const popoutRect = popout.getBoundingClientRect();
+    let left = rect.left + rect.width / 2 - popoutRect.width / 2;
+    left = Math.max(10, Math.min(left, window.innerWidth - popoutRect.width - 10));
+    let top = rect.bottom + 10;
+    if (top + popoutRect.height > window.innerHeight - 10) top = rect.top - popoutRect.height - 10;
+    popout.style.left = `${left}px`;
+    popout.style.top = `${top}px`;
+  }
+
+  function closeProfilePopout() {
+    $('#user-profile-popout')?.classList.remove('open');
   }
 
   function updateParticipantsDropdown() {
@@ -1610,7 +1791,7 @@
         const gotMic = await preacquireMic();
         micAcquirePromise = null;
         if (gotMic && localStream) {
-          setupAudioProcessing();
+          await setupAudioProcessing();
           enumerateDevices();
         } else {
           toast('Mic not available — others won\'t hear you', 'error');
@@ -1805,17 +1986,37 @@
     });
 
     socket.on('chat-message', (data) => {
-      UI_SOUNDS.play('msg');
+      const mentionsMe = data.socketId !== mySocketId && messageMentionsMe(data.text);
+      UI_SOUNDS.play(mentionsMe ? 'mention' : 'msg');
       addChatMessage(data);
       if (!chatOpen && data.socketId !== mySocketId) {
         unreadCount++;
         updateChatBadge();
+      }
+      if (mentionsMe && (!chatOpen || document.hidden)) {
+        toast(`${data.name} mentioned you`, 'info');
       }
     });
 
     socket.on('chat-message-deleted', (data) => {
       const msg = $(`[data-msgid="${data.msgId}"]`);
       if (msg) msg.remove();
+    });
+
+    socket.on('chat-message-edited', (data) => {
+      const msgEl = $(`[data-msgid="${data.msgId}"]`);
+      if (!msgEl) return;
+      const editInput = msgEl.querySelector('.chat-msg-edit-input');
+      const textHtml = `${formatMessageText(data.text)} <span class="chat-msg-edited-tag">(edited)</span>`;
+      if (editInput) {
+        const textEl = document.createElement('div');
+        textEl.className = 'chat-msg-text';
+        textEl.innerHTML = textHtml;
+        editInput.replaceWith(textEl);
+      } else {
+        const textEl = msgEl.querySelector('.chat-msg-text');
+        if (textEl) textEl.innerHTML = textHtml;
+      }
     });
 
     socket.on('message-reactions-updated', (data) => {
@@ -1935,10 +2136,39 @@
   }
 
   // ── MESSAGES RENDERING WITH REPLIES & REACTIONS ──
+  function getRoomParticipantNames() {
+    const names = new Set();
+    if (window.userName) names.add(window.userName);
+    Object.values(peers).forEach(p => { if (p.name) names.add(p.name); });
+    return names;
+  }
+
+  function messageMentionsMe(text) {
+    if (!text || !window.userName) return false;
+    const escapedName = window.userName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`@${escapedName}\\b`).test(text);
+  }
+
+  function highlightMentions(escapedHtml) {
+    const names = [...getRoomParticipantNames()];
+    if (names.length === 0) return escapedHtml;
+    // Longest names first so "@Ann" doesn't swallow part of "@Annie"
+    const pattern = names
+      .sort((a, b) => b.length - a.length)
+      .map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('|');
+    return escapedHtml.replace(new RegExp(`@(${pattern})\\b`, 'g'), (match, name) => {
+      const isMe = name === window.userName;
+      return `<span class="chat-mention${isMe ? ' chat-mention-me' : ''}">@${name}</span>`;
+    });
+  }
+
   function formatMessageText(text) {
-    // Escape first, then linkify — URLs become clickable without XSS risk
+    // Escape first, mention-highlight, THEN linkify — in that order so the
+    // URL regex (which stops at "<") never straddles a mention span's tags.
     const escaped = escapeHtml(text || '');
-    return escaped.replace(/(https?:\/\/[^\s<]+)/g,
+    const mentioned = highlightMentions(escaped);
+    return mentioned.replace(/(https?:\/\/[^\s<]+)/g,
       (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-link">${url}</a>`);
   }
 
@@ -1959,8 +2189,9 @@
     const wasNearBottom = isChatNearBottom(container);
     const time = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+    const isMentioned = !isOwn && messageMentionsMe(data.text);
     const el = document.createElement('div');
-    el.className = `chat-msg${isOwn ? ' own' : ''}${data.isWhisper ? ' whisper' : ''}`;
+    el.className = `chat-msg${isOwn ? ' own' : ''}${data.isWhisper ? ' whisper' : ''}${isMentioned ? ' mentioned' : ''}`;
     el.dataset.msgid = data.msgId;
 
     let senderAvatar = isOwn ? userAvatar : (peers[data.socketId]?.avatar || null);
@@ -1989,14 +2220,16 @@
       `;
     }
 
-    // Action Hover Box (reactions, reply, delete, pin)
+    // Action Hover Box (reactions, reply, edit, delete, pin)
     const isAdmin = isCreator || roomModerators.includes(window.userName);
+    const editBtn = isOwn && !data.file ? `<button class="msg-action-icon-btn" data-act-edit="${data.msgId}" title="Edit Message">✏️</button>` : '';
     const deleteBtn = (isOwn || isAdmin) ? `<button class="msg-action-icon-btn" data-act-del="${data.msgId}" title="Delete Message">🗑️</button>` : '';
     const pinBtn = isAdmin ? `<button class="msg-action-icon-btn" data-act-pin="${data.msgId}" title="Pin Message">📌</button>` : '';
     const actionsHoverHtml = `
       <div class="chat-msg-actions-hover">
         <button class="msg-action-icon-btn" data-act-react="${data.msgId}" title="React">😀</button>
         <button class="msg-action-icon-btn" data-act-reply="${data.msgId}" title="Reply">↩️</button>
+        ${editBtn}
         ${pinBtn}
         ${deleteBtn}
       </div>
@@ -2016,7 +2249,7 @@
         </div>
         <span class="chat-msg-time">${time}</span>
       </div>
-      <div class="chat-msg-text">${formatMessageText(data.text)}</div>
+      <div class="chat-msg-text">${formatMessageText(data.text)}${data.edited ? ' <span class="chat-msg-edited-tag">(edited)</span>' : ''}</div>
       ${fileHtml}
       <div class="msg-reactions"></div>
     `;
@@ -2034,6 +2267,40 @@
 
     // Render reactions if payload has them
     if (data.reactions) renderMessageReactions(el, data.reactions);
+  }
+
+  // Turns a message's text into an inline input (Enter to save, Escape to
+  // cancel) — mirrors Discord's in-place message editing.
+  function beginEditMessage(msgId) {
+    const msgEl = $(`[data-msgid="${msgId}"]`);
+    if (!msgEl) return;
+    const textEl = msgEl.querySelector('.chat-msg-text');
+    if (!textEl || textEl.querySelector('.chat-msg-edit-input')) return;
+    const currentText = textEl.textContent.replace(/\(edited\)\s*$/, '').trim();
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'chat-msg-edit-input';
+    input.value = currentText;
+    input.maxLength = 500;
+    textEl.replaceWith(input);
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+
+    const finish = (save) => {
+      if (!input.isConnected) return;
+      const newText = input.value.trim();
+      if (save && newText && newText !== currentText) {
+        socket.emit('edit-chat-message', { roomId, msgId, text: newText });
+      } else {
+        input.replaceWith(textEl); // restore original, unedited view
+      }
+    };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    });
+    input.addEventListener('blur', () => finish(true));
   }
 
   function renderMessageReactions(msgElement, reactions) {
@@ -2295,11 +2562,13 @@
     focusedShareId = null;
     renderScreenShares();
     setMicBanner(false);
+    teardownMicPipeline();
     if (localStream) localStream.getTracks().forEach(t => t.stop());
     localStream = null;
     micAcquirePromise = null;
     if (audioContext) audioContext.close();
     audioContext = null;
+    audioWorkletModulePromise = null; // new AudioContext next join needs the module re-registered
     roomId = null;
     roomPassword = null;
     isMuted = false;
@@ -2324,6 +2593,122 @@
     }
 
     switchScreen('lobby');
+  }
+
+  // ── FULL EMOJI PICKER ──
+  function initEmojiPicker() {
+    const picker = $('#emoji-picker');
+    const moreBtn = $('#btn-emoji-more');
+    if (!picker || !moreBtn) return;
+
+    picker.innerHTML = Object.entries(EMOJI_CATEGORIES).map(([category, emojis]) => `
+      <div class="emoji-picker-category">
+        <div class="emoji-picker-category-label">${category}</div>
+        <div class="emoji-picker-grid">
+          ${emojis.map(e => `<button class="emoji-picker-item" data-emoji="${e}">${e}</button>`).join('')}
+        </div>
+      </div>
+    `).join('');
+
+    picker.addEventListener('click', (e) => {
+      const btn = e.target.closest('.emoji-picker-item');
+      if (!btn) return;
+      const input = $('#chat-input');
+      input.value += btn.dataset.emoji;
+      input.focus();
+    });
+
+    moreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+    });
+    document.addEventListener('click', (e) => {
+      if (picker.style.display !== 'none' && !e.target.closest('#emoji-picker') && !e.target.closest('#btn-emoji-more')) {
+        picker.style.display = 'none';
+      }
+    });
+  }
+
+  // ── @MENTION AUTOCOMPLETE ──
+  let mentionActiveIndex = 0;
+
+  function getMentionQuery(input) {
+    const caret = input.selectionStart;
+    const uptoCaret = input.value.slice(0, caret);
+    const match = uptoCaret.match(/(?:^|\s)@(\w*)$/);
+    return match ? match[1] : null;
+  }
+
+  function updateMentionDropdown(input) {
+    const query = getMentionQuery(input);
+    const dropdown = $('#mention-dropdown');
+    if (query === null) {
+      dropdown.style.display = 'none';
+      return;
+    }
+    const names = [...getRoomParticipantNames()].filter(n =>
+      n.toLowerCase().startsWith(query.toLowerCase()) && n !== window.userName
+    );
+    if (names.length === 0) {
+      dropdown.style.display = 'none';
+      return;
+    }
+    mentionActiveIndex = 0;
+    dropdown.innerHTML = names.map((n, i) =>
+      `<div class="mention-item${i === 0 ? ' active' : ''}" data-name="${escapeHtml(n)}">@${escapeHtml(n)}</div>`
+    ).join('');
+    dropdown.style.display = 'block';
+    dropdown.querySelectorAll('.mention-item').forEach(item => {
+      item.addEventListener('click', () => insertMention(input, item.dataset.name));
+    });
+  }
+
+  function insertMention(input, name) {
+    const caret = input.selectionStart;
+    const uptoCaret = input.value.slice(0, caret);
+    const rest = input.value.slice(caret);
+    const replaced = uptoCaret.replace(/@(\w*)$/, `@${name} `);
+    input.value = replaced + rest;
+    const newCaret = replaced.length;
+    input.setSelectionRange(newCaret, newCaret);
+    input.focus();
+    $('#mention-dropdown').style.display = 'none';
+  }
+
+  function handleMentionDropdownKeydown(e) {
+    const dropdown = $('#mention-dropdown');
+    if (!dropdown || dropdown.style.display === 'none') return false;
+    const items = [...dropdown.querySelectorAll('.mention-item')];
+    if (items.length === 0) return false;
+
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      items[mentionActiveIndex].classList.remove('active');
+      mentionActiveIndex = e.key === 'ArrowDown'
+        ? (mentionActiveIndex + 1) % items.length
+        : (mentionActiveIndex - 1 + items.length) % items.length;
+      items[mentionActiveIndex].classList.add('active');
+      return true;
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      insertMention(e.target, items[mentionActiveIndex].dataset.name);
+      return true;
+    }
+    if (e.key === 'Escape') {
+      dropdown.style.display = 'none';
+      return true;
+    }
+    return false;
+  }
+
+  function initMentionAutocomplete() {
+    document.addEventListener('click', (e) => {
+      const dropdown = $('#mention-dropdown');
+      if (dropdown && !e.target.closest('#mention-dropdown') && e.target.id !== 'chat-input') {
+        dropdown.style.display = 'none';
+      }
+    });
   }
 
   function sendMessage() {
@@ -2592,12 +2977,12 @@
         const oldId = $('#input-device')?.value;
         localStream.getTracks().forEach(t => t.stop());
         await getMediaStream(oldId);
-        setupAudioProcessing();
+        await setupAudioProcessing();
         // Replace in all peers
-        const newTrack = localStream.getAudioTracks()[0];
+        const newTrack = getOutgoingMicTrack();
         for (const [sid, peer] of Object.entries(peers)) {
           const sender = peer.pc.getSenders().find(s => s.track && s.track.kind === 'audio');
-          if (sender) await sender.replaceTrack(newTrack);
+          if (sender && newTrack) await sender.replaceTrack(newTrack);
         }
         toast('Echo Cancellation constraints updated.', 'success');
       }
@@ -2962,6 +3347,29 @@
       }
     });
 
+    // Profile popout — click any avatar (own or peer's) in the grid
+    $('#user-grid')?.addEventListener('click', (e) => {
+      const avatar = e.target.closest('.user-avatar');
+      if (!avatar) return;
+      const card = avatar.closest('.user-card');
+      if (!card) return;
+      e.stopPropagation();
+      openProfilePopout(card);
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#user-profile-popout') && !e.target.closest('.user-avatar')) {
+        closeProfilePopout();
+      }
+    });
+
+    // Keyboard shortcuts help modal
+    $('#btn-shortcuts-help')?.addEventListener('click', () => {
+      $('#shortcuts-modal').classList.add('open');
+    });
+    $('#shortcuts-close')?.addEventListener('click', () => {
+      $('#shortcuts-modal').classList.remove('open');
+    });
+
     $('#btn-leave').addEventListener('click', () => {
       $('#leave-modal').classList.add('open');
     });
@@ -2981,18 +3389,22 @@
 
     $('#btn-send').addEventListener('click', sendMessage);
     $('#chat-input').addEventListener('keydown', (e) => {
+      if (handleMentionDropdownKeydown(e)) return; // dropdown consumed the key
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         sendMessage();
       }
     });
 
-    $('#chat-input').addEventListener('input', () => {
+    $('#chat-input').addEventListener('input', (e) => {
       if (!socket || !roomId) return;
       socket.emit('typing-start', { roomId });
       clearTimeout(typingTimeout);
       typingTimeout = setTimeout(() => socket.emit('typing-stop', { roomId }), 2000);
+      updateMentionDropdown(e.target);
     });
+
+    initMentionAutocomplete();
 
     $('#chat-file-input').addEventListener('change', (e) => {
       const file = e.target.files[0];
@@ -3000,13 +3412,15 @@
       e.target.value = '';
     });
 
-    $$('.emoji-btn').forEach(btn => {
+    $$('.emoji-btn[data-emoji]').forEach(btn => {
       btn.addEventListener('click', () => {
         const input = $('#chat-input');
         input.value += btn.dataset.emoji;
         input.focus();
       });
     });
+
+    initEmojiPicker();
 
     $('#btn-record').addEventListener('click', () => {
       if (isRecording) stopRecording();
@@ -3076,6 +3490,7 @@
 
     $('#noise-threshold').addEventListener('input', (e) => {
       $('#noise-threshold-val').textContent = e.target.value;
+      applyNoiseThreshold(e.target.value);
     });
 
     $('#input-device').addEventListener('change', async (e) => {
@@ -3084,11 +3499,11 @@
       if (localStream) localStream.getTracks().forEach(t => t.stop());
       const gotMic = await getMediaStream(deviceId);
       if (gotMic && localStream) {
-        setupAudioProcessing();
-        const newTrack = localStream.getAudioTracks()[0];
+        await setupAudioProcessing();
+        const newTrack = getOutgoingMicTrack();
         for (const [sid, peer] of Object.entries(peers)) {
           const sender = peer.pc.getSenders().find(s => s.track && s.track.kind === 'audio');
-          if (sender) await sender.replaceTrack(newTrack);
+          if (sender && newTrack) await sender.replaceTrack(newTrack);
         }
         toast('Input device changed', 'success');
       }
@@ -3159,6 +3574,13 @@
       const actDel = e.target.closest('[data-act-del]');
       if (actDel) {
         socket.emit('delete-chat-message', { roomId, msgId: actDel.dataset.actDel });
+      }
+
+      // 7b. Message Action: Edit Message — swap the text into an inline input
+      const actEdit = e.target.closest('[data-act-edit]');
+      if (actEdit) {
+        const msgId = actEdit.dataset.actEdit;
+        beginEditMessage(msgId);
       }
 
       // 8. Message Action: Pin Message

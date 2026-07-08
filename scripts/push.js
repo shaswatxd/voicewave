@@ -449,131 +449,106 @@ async function main() {
     const sharp = require('sharp');
 
     // Generate icon.png (256x256)
+    // Redesigned v1.0.58: bolder, higher-contrast glyph (own brand, not a
+    // Discord clone) so it still reads clearly at 16x16 tray size, not just
+    // at 512x512 — the old design's fine mesh-lines/wordmark turned to mush
+    // when scaled down.
     const iconSvg = `<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <!-- Background Gradient: Deep Space Midnight Purple to Dark Blue -->
         <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#040209" />
-          <stop offset="50%" stop-color="#0B071E" />
-          <stop offset="100%" stop-color="#020105" />
-        </linearGradient>
-        
-        <!-- Neon Pink to Purple Gradient -->
-        <linearGradient id="neon-pink" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#FF2E93" />
-          <stop offset="100%" stop-color="#A100FF" />
-        </linearGradient>
-        
-        <!-- Neon Cyan to Blue Gradient -->
-        <linearGradient id="neon-cyan" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#00F0FF" />
-          <stop offset="100%" stop-color="#0066FF" />
+          <stop offset="0%" stop-color="#0a0518" />
+          <stop offset="55%" stop-color="#050311" />
+          <stop offset="100%" stop-color="#020103" />
         </linearGradient>
 
-        <!-- Accent Coral/Gold Gradient -->
-        <linearGradient id="accent-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#FF5E00" />
-          <stop offset="100%" stop-color="#FF9E00" />
-        </linearGradient>
-
-        <!-- Glowing Border Gradient -->
         <linearGradient id="border-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#00F0FF" stop-opacity="0.8" />
-          <stop offset="35%" stop-color="#FF2E93" stop-opacity="0.2" />
-          <stop offset="70%" stop-color="#A100FF" stop-opacity="0.1" />
-          <stop offset="100%" stop-color="#00F0FF" stop-opacity="0.6" />
+          <stop offset="0%" stop-color="#22d3ee" />
+          <stop offset="50%" stop-color="#a855f7" />
+          <stop offset="100%" stop-color="#22d3ee" />
         </linearGradient>
 
-        <!-- Glassmorphic Card Gradient -->
-        <linearGradient id="glass-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.1" />
-          <stop offset="120%" stop-color="#FFFFFF" stop-opacity="0.01" />
+        <linearGradient id="wave-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#e0f7ff" />
+          <stop offset="45%" stop-color="#22d3ee" />
+          <stop offset="100%" stop-color="#a855f7" />
         </linearGradient>
 
-        <!-- Filters for High-Quality Neon Glows -->
-        <filter id="neon-glow-strong" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="16" result="blur1" />
-          <feGaussianBlur stdDeviation="32" result="blur2" />
+        <radialGradient id="top-sheen" cx="30%" cy="18%" r="70%">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18" />
+          <stop offset="60%" stop-color="#ffffff" stop-opacity="0.03" />
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+        </radialGradient>
+
+        <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="14" result="b1" />
+          <feGaussianBlur stdDeviation="28" result="b2" />
           <feMerge>
-            <feMergeNode in="blur2" />
-            <feMergeNode in="blur1" />
+            <feMergeNode in="b2" />
+            <feMergeNode in="b1" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
 
-        <filter id="neon-glow-subtle" x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="8" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-
-        <filter id="glass-shadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#000000" flood-opacity="0.75" />
+        <filter id="soft-shadow" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#000000" flood-opacity="0.55" />
         </filter>
       </defs>
 
-      <!-- Base squircle shape -->
-      <rect x="2" y="2" width="508" height="508" rx="124" fill="url(#bg-grad)" stroke="url(#border-grad)" stroke-width="4" />
+      <!-- Base squircle: bold gradient border + deep drop shadow for a premium 3D-badge feel -->
+      <rect x="6" y="6" width="500" height="500" rx="118" fill="url(#bg-grad)" stroke="url(#border-grad)" stroke-width="7" filter="url(#soft-shadow)" />
+      <!-- Glass sheen top-left for depth -->
+      <rect x="6" y="6" width="500" height="500" rx="118" fill="url(#top-sheen)" />
 
-      <!-- Background Orbs for atmospheric lighting -->
-      <circle cx="160" cy="160" r="180" fill="#FF2E93" opacity="0.12" filter="url(#neon-glow-strong)" />
-      <circle cx="350" cy="350" r="200" fill="#00F0FF" opacity="0.1" filter="url(#neon-glow-strong)" />
+      <!-- Ambient glow orbs (large/soft, reads fine at 256px+ — small sizes use the crisp variant below instead) -->
+      <circle cx="150" cy="150" r="140" fill="#a855f7" opacity="0.18" filter="url(#glow)" />
+      <circle cx="360" cy="360" r="150" fill="#22d3ee" opacity="0.16" filter="url(#glow)" />
 
-      <!-- Outer orbital/constellation tracks (WebRTC P2P Mesh feeling) -->
-      <g opacity="0.3" filter="url(#neon-glow-subtle)">
-        <circle cx="256" cy="256" r="200" stroke="url(#neon-cyan)" stroke-width="1.5" stroke-dasharray="8 20" />
-        <circle cx="256" cy="256" r="170" stroke="url(#neon-pink)" stroke-width="1" stroke-dasharray="4 12" />
+      <!-- Bold equalizer-style voice-wave glyph — few thick bars, high contrast -->
+      <g filter="url(#glow)">
+        <rect x="161" y="216" width="26" height="80" rx="13" fill="url(#wave-grad)" />
+        <rect x="202" y="176" width="26" height="160" rx="13" fill="url(#wave-grad)" />
+        <rect x="243" y="140" width="26" height="232" rx="13" fill="#ffffff" />
+        <rect x="284" y="176" width="26" height="160" rx="13" fill="url(#wave-grad)" />
+        <rect x="325" y="216" width="26" height="80" rx="13" fill="url(#wave-grad)" />
       </g>
+    </svg>`;
 
-      <!-- P2P Mesh nodes connecting the outer ring -->
-      <g opacity="0.6">
-        <circle cx="256" cy="56" r="6" fill="#00F0FF" filter="url(#neon-glow-subtle)" />
-        <line x1="256" y1="56" x2="156" y2="120" stroke="url(#neon-cyan)" stroke-width="1" stroke-dasharray="4 4" />
-        
-        <circle cx="156" cy="120" r="5" fill="#FF2E93" filter="url(#neon-glow-subtle)" />
-        <line x1="156" y1="120" x2="96" y2="256" stroke="url(#neon-pink)" stroke-width="1" stroke-dasharray="4 4" />
-
-        <circle cx="96" cy="256" r="5" fill="#A100FF" filter="url(#neon-glow-subtle)" />
-        
-        <circle cx="416" cy="256" r="5" fill="#00F0FF" filter="url(#neon-glow-subtle)" />
-        <line x1="416" y1="256" x2="356" y2="120" stroke="url(#neon-cyan)" stroke-width="1" stroke-dasharray="4 4" />
-        <line x1="356" y1="120" x2="256" y2="56" stroke="url(#neon-pink)" stroke-width="1" stroke-dasharray="4 4" />
-
-        <circle cx="356" cy="120" r="5" fill="#FF2E93" filter="url(#neon-glow-subtle)" />
-      </g>
-
-      <!-- Central Glassmorphic Hexagonal Shield (Sophisticated framing) -->
-      <path d="M 256,110 L 382,183 L 382,329 L 256,402 L 130,329 L 130,183 Z" fill="url(#glass-grad)" stroke="rgba(255, 255, 255, 0.15)" stroke-width="2" filter="url(#glass-shadow)" />
-      <path d="M 256,110 L 382,183 L 382,230 L 256,157 L 130,230 L 130,183 Z" fill="rgba(255, 255, 255, 0.08)" />
-
-      <!-- Overlapping fluid Voice Waves in the center -->
-      <g filter="url(#neon-glow-strong)" opacity="0.95">
-        <path d="M 150,260 C 180,200 200,320 230,260 C 260,200 280,320 310,260 C 340,200 350,280 362,260" stroke="url(#neon-pink)" stroke-width="8" stroke-linecap="round" fill="none" />
-        <path d="M 150,260 C 170,310 200,190 230,260 C 260,330 290,210 320,260 C 340,300 350,230 362,260" stroke="url(#neon-cyan)" stroke-width="10" stroke-linecap="round" fill="none" />
-        <circle cx="230" cy="260" r="6" fill="#FFFFFF" filter="url(#neon-glow-subtle)" />
-        <circle cx="320" cy="260" r="4" fill="#FF9E00" filter="url(#neon-glow-subtle)" />
-        <circle cx="170" cy="285" r="4" fill="#00F0FF" filter="url(#neon-glow-subtle)" />
-      </g>
-
-      <!-- Sleek Logo Text (VoiceWave) integrated in icon at bottom -->
-      <text x="256" y="375" fill="#FFFFFF" font-family="'Segoe UI', 'Outfit', sans-serif" font-size="16" font-weight="700" letter-spacing="4" text-anchor="middle" opacity="0.8">VOICEWAVE</text>
-
-      <!-- Accent sparkles/particles -->
-      <g filter="url(#neon-glow-subtle)">
-        <polygon points="360,150 364,154 368,150 364,146" fill="#00F0FF" />
-        <polygon points="150,330 152,332 154,330 152,328" fill="#FF2E93" />
-        <circle cx="370" cy="310" r="3" fill="#FF9E00" />
-        <circle cx="140" cy="160" r="2.5" fill="#00F0FF" />
-      </g>
+    // Crisp variant for small raster targets (tray icon, small .ico sizes):
+    // no blur filters at all — a 512-unit-space Gaussian blur (even at a
+    // "subtle" stdDeviation) becomes a smear once downsampled to 16-32px, so
+    // small sizes get flat fills and no drop-shadow instead, keeping the
+    // equalizer-bar glyph and border crisp and recognizable at tray size.
+    const iconSvgCrisp = `<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#0a0518" />
+          <stop offset="55%" stop-color="#050311" />
+          <stop offset="100%" stop-color="#020103" />
+        </linearGradient>
+        <linearGradient id="border-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#22d3ee" />
+          <stop offset="50%" stop-color="#a855f7" />
+          <stop offset="100%" stop-color="#22d3ee" />
+        </linearGradient>
+        <linearGradient id="wave-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#e0f7ff" />
+          <stop offset="45%" stop-color="#22d3ee" />
+          <stop offset="100%" stop-color="#a855f7" />
+        </linearGradient>
+      </defs>
+      <rect x="6" y="6" width="500" height="500" rx="118" fill="url(#bg-grad)" stroke="url(#border-grad)" stroke-width="14" />
+      <rect x="153" y="208" width="34" height="96" rx="17" fill="url(#wave-grad)" />
+      <rect x="199" y="168" width="34" height="176" rx="17" fill="url(#wave-grad)" />
+      <rect x="245" y="128" width="34" height="256" rx="17" fill="#ffffff" />
+      <rect x="291" y="168" width="34" height="176" rx="17" fill="url(#wave-grad)" />
+      <rect x="337" y="208" width="34" height="96" rx="17" fill="url(#wave-grad)" />
     </svg>`;
 
     await sharp(Buffer.from(iconSvg)).resize(256, 256).png().toFile(path.join(assetsDir, 'icon.png'));
     ok('icon.png generated (256x256)');
 
-    // Generate tray.png (16x16)
-    await sharp(Buffer.from(iconSvg)).resize(16, 16).png().toFile(path.join(assetsDir, 'tray.png'));
+    // Generate tray.png (16x16) — crisp variant, no blur filters to smear at this size
+    await sharp(Buffer.from(iconSvgCrisp)).resize(16, 16).png().toFile(path.join(assetsDir, 'tray.png'));
     ok('tray.png generated (16x16)');
 
     // Generate public/icon.png (512x512 for PWA)
@@ -592,11 +567,13 @@ async function main() {
     await sharp(Buffer.from(iconSvg)).resize(512, 512).png().toFile(path.join(PUB, 'icon-maskable.png'));
     ok('public/icon-maskable.png generated (512x512)');
 
-    // Generate ico (multiple sizes for Windows)
+    // Generate ico (multiple sizes for Windows) — crisp variant for sizes
+    // where the glow filter would otherwise smear into an unrecognizable blob
     const sizes = [16, 24, 32, 48, 64, 128, 256];
     const icoBuffers = [];
     for (const size of sizes) {
-      const buf = await sharp(Buffer.from(iconSvg)).resize(size, size).png().toBuffer();
+      const svgSource = size <= 32 ? iconSvgCrisp : iconSvg;
+      const buf = await sharp(Buffer.from(svgSource)).resize(size, size).png().toBuffer();
       icoBuffers.push({ size, buf });
     }
 

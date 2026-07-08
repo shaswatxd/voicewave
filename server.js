@@ -313,12 +313,29 @@ io.on('connection', (socket) => {
     if (!room) return;
     const isCreator = room.creator === socket.id;
     const isMod = room.moderators.includes(socket.userName);
+    const msg = room.history.find(m => m.msgId === msgId);
+    const isOwner = msg && msg.socketId === socket.id;
 
-    if (isCreator || isMod) {
+    if (isCreator || isMod || isOwner) {
       room.history = room.history.filter(m => m.msgId !== msgId);
       io.to(roomId).emit('chat-message-deleted', { msgId, deletedBy: socket.id, isCreator });
       saveRoomsToDisk();
     }
+  });
+
+  // Edit message — sender only (not admins/mods, matches Discord's own convention)
+  socket.on('edit-chat-message', ({ roomId, msgId, text }) => {
+    const room = rooms.get(roomId);
+    if (!room) return;
+    if (!text || typeof text !== 'string') return;
+
+    const msg = room.history.find(m => m.msgId === msgId);
+    if (!msg || msg.socketId !== socket.id) return;
+
+    msg.text = text.length > 500 ? text.slice(0, 500) : text;
+    msg.edited = true;
+    io.to(roomId).emit('chat-message-edited', { msgId, text: msg.text });
+    saveRoomsToDisk();
   });
 
   // Message Reactions

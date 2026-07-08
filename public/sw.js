@@ -1,9 +1,10 @@
-const CACHE_NAME = 'voicewave-v1.0.57';
+const CACHE_NAME = 'voicewave-v1.0.59';
 const ASSETS = [
   '/',
   '/app',
   '/app.css',
   '/app.js',
+  '/audio-gate-worklet.js',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png'
