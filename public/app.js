@@ -3137,10 +3137,14 @@
       }
     });
 
-    // ── SCREEN SHARE TRIGGERS (desktop app has a custom picker; browsers use the native one) ──
+    // ── SCREEN SHARE TRIGGERS (desktop app has a custom picker; desktop browsers use the native one) ──
+    // Mobile browsers (Android/iOS) don't have a reliable getDisplayMedia
+    // picker — some report the API as present but it fails or behaves
+    // inconsistently — so screen share is desktop-only, full stop.
+    const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const screenShareBtn = $('#btn-screen-share');
     const canShareScreen = (window.electronAPI && window.electronAPI.isElectron) ||
-      (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+      (!isMobileDevice && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
     if (screenShareBtn && canShareScreen) {
       screenShareBtn.style.display = 'flex';
       screenShareBtn.addEventListener('click', () => {
