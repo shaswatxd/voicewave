@@ -236,7 +236,7 @@
   let lastWatchingEmit = undefined; // last focusedShareId we told the server we're watching
   let connectingWaitTimer = null; // "still connecting" message escalation for the stage-waiting spinner
   let connectingWaitFor = null;
-  let manualShareFocus = localStorage.getItem('vw_manual_share_focus') === '1'; // opt-in: don't auto-open others' shares
+  let manualShareFocus = localStorage.getItem('vw_manual_share_focus') !== '0'; // default ON: don't auto-open others' shares until clicked
   let stageVolume = parseInt(localStorage.getItem('vw_stage_volume') || '100');
   let shareResolution = localStorage.getItem('vw_share_res') || '1080';
   let shareFps = parseInt(localStorage.getItem('vw_share_fps') || '30');
@@ -935,6 +935,15 @@
     const peer = peers[socketId];
     if (!peer) return;
     try {
+      // A late-arriving answer can be stale — if a competing offer already
+      // rolled this connection back to 'stable' (or moved it elsewhere)
+      // since we sent the offer this answer replies to, applying it now
+      // fights the connection's actual current state and throws ("m-lines
+      // order doesn't match"), corrupting the connection so tracks/renegotiation
+      // never recover — surfacing as a share stuck on "Connecting to stream"
+      // forever for that viewer. Only a pc still waiting on this exact
+      // exchange (have-local-offer) should apply it; anything else is stale.
+      if (peer.pc.signalingState !== 'have-local-offer') return;
       await peer.pc.setRemoteDescription(answer);
       await flushPendingCandidates(peer);
     } catch (err) {
