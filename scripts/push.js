@@ -20,7 +20,9 @@ function run(cmd, opts = {}) {
   try {
     execSync(cmd, { stdio: 'inherit', cwd: ROOT, ...opts });
     return true;
-  } catch {
+  } catch (e) {
+    err(`Command failed: ${cmd}`);
+    if (e.message) err(e.message);
     return false;
   }
 }
@@ -588,18 +590,32 @@ async function main() {
 
   // ── STEP 13: Build Electron ──
   log('Step 13: Building Electron app...');
+  let buildOk = false;
   if (process.platform === 'win32') {
-    run('npx electron-builder --win --x64 --publish never');
+    buildOk = run('node_modules\\.bin\\electron-builder.cmd --win --x64 --publish never');
   } else {
-    run('npx electron-builder --linux --x64');
+    buildOk = run('./node_modules/.bin/electron-builder --linux --x64');
+  }
+  if (!buildOk) {
+    err('Electron build failed');
+    process.exit(1);
   }
   ok('Electron build complete');
 
   // ── STEP 14: Git push ──
   log('Step 14: Pushing to git...');
-  run('git add -A');
-  run(`git commit -m "v${VERSION} - publish ${timestamp}"`);
-  run('git push origin master --force');
+  if (!run('git add -A')) {
+    err('Git add failed');
+    process.exit(1);
+  }
+  if (!run(`git commit -m "v${VERSION} - publish ${timestamp}"`)) {
+    err('Git commit failed');
+    process.exit(1);
+  }
+  if (!run('git push origin master --force')) {
+    err('Git push failed');
+    process.exit(1);
+  }
   ok('Pushed to master');
 
   // ── STEP 15: GitHub Release ──
@@ -616,7 +632,10 @@ async function main() {
     if (fs.existsSync(blockmapPath)) uploadFiles.push(blockmapPath);
     ymlFiles.forEach(f => uploadFiles.push(path.join(DIST, f)));
     const fileArgs = uploadFiles.map(f => `"${f}"`).join(' ');
-    run(`gh release create v${VERSION} ${fileArgs} --title "v${VERSION}" --notes "VoiceWave v${VERSION} release"`);
+    if (!run(`gh release create v${VERSION} ${fileArgs} --title "v${VERSION}" --notes "VoiceWave v${VERSION} release"`)) {
+      err('GitHub release creation failed');
+      process.exit(1);
+    }
     ok('GitHub release created with installer + update files');
   } else {
     err('Installer not found, skipping GitHub release');

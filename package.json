@@ -1,6 +1,6 @@
 {
   "name": "voicewave",
-  "version": "1.0.82",
+  "version": "1.0.83",
   "description": "Crystal-clear real-time voice chat — WebRTC P2P mesh with Socket.IO signaling",
   "main": "main.js",
   "scripts": {
