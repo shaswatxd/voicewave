@@ -624,7 +624,9 @@ async function main() {
 
   // ── STEP 16: Post-Publish Cleanup ──
   log('Step 16: Cleaning up workspace...');
-  deleteFolder(DIST);
+  // Keep the dist folder after publish so that built installers/executables remain available.
+  // The old dist is cleaned up at the beginning of the next publish run (Step 4).
+  // deleteFolder(DIST);
   const roomsFile = path.join(ROOT, 'rooms.json');
   if (fs.existsSync(roomsFile)) {
     log('Deleting rooms.json...');
