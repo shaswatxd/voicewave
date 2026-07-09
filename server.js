@@ -209,7 +209,7 @@ io.on('connection', (socket) => {
       polls: room.polls, // Send active polls
       pinned: room.pinned, // Send pinned messages
       // Ongoing screen shares, if any — strip the server-only watchers Set
-      screenShares: Object.values(room.screenShares || {}).map(({ socketId, name, streamId }) => ({ socketId, name, streamId }))
+      screenShares: Object.values(room.screenShares || {}).map(({ socketId, name, streamId, paused }) => ({ socketId, name, streamId, paused: !!paused }))
     });
 
     socket.to(roomId).emit('peer-joined', {
@@ -269,6 +269,33 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('screen-share-stopped', { socketId: socket.id });
   });
 
+  socket.on('screen-share-pause', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    const share = room?.screenShares?.[socket.id];
+    if (!share) return;
+    share.paused = true;
+    io.to(roomId).emit('screen-share-paused', { socketId: socket.id });
+  });
+
+  socket.on('screen-share-resume', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    const share = room?.screenShares?.[socket.id];
+    if (!share) return;
+    share.paused = false;
+    io.to(roomId).emit('screen-share-resumed', { socketId: socket.id });
+  });
+
+  // Source switch mid-share — deliberately NOT the same event as
+  // screen-share-start, which would re-fire the "X is live!" toast for
+  // every viewer on a mere source change.
+  socket.on('screen-share-switch', ({ roomId, streamId }) => {
+    const room = rooms.get(roomId);
+    const share = room?.screenShares?.[socket.id];
+    if (!share) return;
+    share.streamId = streamId;
+    io.to(roomId).emit('screen-share-switched', { socketId: socket.id, streamId });
+  });
+
   // Live viewer count ("N watching", Discord Go-Live style) — a viewer only
   // watches one stream at a time, so switching focus moves them, it doesn't add up.
   socket.on('watching-share', ({ roomId, sharerSocketId }) => {
@@ -290,6 +317,36 @@ io.on('connection', (socket) => {
       const share = room.screenShares[sid];
       if (share) io.to(roomId).emit('watcher-count-updated', { sharerSocketId: sid, count: share.watchers.size });
     });
+  });
+
+  // Laser pointer — scoped to whoever's actually watching this specific
+  // share (reuses the same watchers Set as the viewer-count feature), plus
+  // the sharer themselves even though they're deliberately excluded from
+  // their own watchers set above.
+  function pointerRecipients(room, sharerSocketId, excludeSocketId) {
+    const share = room.screenShares?.[sharerSocketId];
+    const ids = new Set(share ? share.watchers : []);
+    if (sharerSocketId) ids.add(sharerSocketId);
+    ids.delete(excludeSocketId);
+    return ids;
+  }
+
+  socket.on('pointer-move', ({ roomId, sharerSocketId, x, y }) => {
+    const room = rooms.get(roomId);
+    if (!room || !room.users.has(socket.id) || !room.screenShares?.[sharerSocketId]) return;
+    const payload = {
+      socketId: socket.id,
+      name: socket.userName,
+      x: Math.min(1, Math.max(0, Number(x) || 0)),
+      y: Math.min(1, Math.max(0, Number(y) || 0))
+    };
+    pointerRecipients(room, sharerSocketId, socket.id).forEach(id => io.to(id).emit('pointer-move', payload));
+  });
+
+  socket.on('pointer-hide', ({ roomId, sharerSocketId }) => {
+    const room = rooms.get(roomId);
+    if (!room || !room.users.has(socket.id)) return;
+    pointerRecipients(room, sharerSocketId, socket.id).forEach(id => io.to(id).emit('pointer-hide', { socketId: socket.id }));
   });
 
   socket.on('user-muted', ({ roomId, muted }) => {

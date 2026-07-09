@@ -2159,3 +2159,99 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
   border-radius: 50%;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
+
+/* ════════════════════════════════════════════════════════════
+   Pause/Resume, Source Switch, Packet-Loss, Laser Pointer
+   ════════════════════════════════════════════════════════════ */
+
+/* ── PAUSED BADGE (mirrors .stage-waiting) ── */
+.stage-paused-badge {
+  position: absolute; inset: 0;
+  display: none;
+  flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  color: #e5e7eb; font-size: 0.85rem; font-weight: 600;
+  background: rgba(0,0,0,0.55);
+  z-index: 3;
+}
+.stage-paused-badge.show { display: flex; }
+
+/* ── LASER POINTER OVERLAY ── */
+#stage-pointer-layer {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  overflow: hidden;
+}
+.pointer-dot {
+  position: absolute;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 10px currentColor, 0 0 2px rgba(0,0,0,0.6);
+  transform: translate(-50%, -50%);
+  transition: opacity 0.4s ease, left 0.05s linear, top 0.05s linear;
+  opacity: 1;
+}
+.pointer-dot.fading { opacity: 0; }
+.pointer-label {
+  position: absolute;
+  top: 16px; left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 2px 7px;
+  background: currentColor;
+  color: #000;
+  border-radius: 5px;
+  font-size: 0.62rem; font-weight: 700;
+}
+.stage-video-wrap.laser-active { cursor: crosshair; }
+.stage-btn.laser-on { background: rgba(34,211,238,0.18); color: var(--cyan); border-color: rgba(34,211,238,0.4); }
+
+/* ── PAUSE / SWITCH BUTTON STATES ── */
+.stage-btn.stage-pause.active { background: rgba(250,204,21,0.15); color: #facc15; border-color: rgba(250,204,21,0.35); }
+
+/* ── CHAT MARKDOWN ── */
+.chat-code-block {
+  margin: 6px 0;
+  padding: 10px 12px;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+.chat-code-block code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  color: #e5e7eb;
+  white-space: pre;
+}
+.chat-inline-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85em;
+  padding: 1px 5px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: #f0abfc;
+}
+.chat-quote {
+  margin: 4px 0;
+  padding: 4px 10px;
+  border-left: 3px solid var(--cyan);
+  color: var(--muted);
+  font-size: 0.92em;
+}
+.chat-spoiler {
+  background: #1a1a1e;
+  color: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+  user-select: none;
+}
+.chat-spoiler.revealed {
+  background: rgba(255,255,255,0.08);
+  color: inherit;
+  user-select: text;
+  cursor: text;
+}

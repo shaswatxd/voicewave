@@ -13,7 +13,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.71">
+<link rel="stylesheet" href="/app.css?v=1.0.74">
 <!-- Consolidated Styles moved to app.css -->
 </head>
 <body>
@@ -230,11 +230,20 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
               <input type="range" id="stage-volume" min="0" max="100" value="100">
             </div>
+            <button class="btn-icon stage-btn" id="stage-laser" title="Laser pointer">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>
+            </button>
             <button class="btn-icon stage-btn" id="stage-pip" title="Picture in Picture">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><rect width="8" height="5" x="12" y="12" rx="1" fill="currentColor"/></svg>
             </button>
             <button class="btn-icon stage-btn" id="stage-fullscreen" title="Fullscreen">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+            </button>
+            <button class="btn-icon stage-btn stage-switch" id="stage-switch-source" title="Switch source" style="display:none;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </button>
+            <button class="btn-icon stage-btn stage-pause" id="stage-pause" title="Pause sharing" style="display:none;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
             </button>
             <button class="btn-icon stage-btn stage-stop" id="stage-stop" title="Stop sharing" style="display:none;">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
@@ -244,9 +253,14 @@
         </div>
         <div class="stage-video-wrap" id="stage-video-wrap">
           <video id="stage-video" autoplay playsinline></video>
+          <div id="stage-pointer-layer"></div>
           <div class="stage-waiting" id="stage-waiting">
             <div class="connecting-spinner" style="width:36px;height:36px;"></div>
             <span>Connecting to stream…</span>
+          </div>
+          <div class="stage-paused-badge" id="stage-paused-badge">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+            <span>Paused</span>
           </div>
         </div>
         <div class="stage-thumbs" id="stage-thumbs" style="display:none;"></div>
@@ -686,7 +700,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.71';
+  window.APP_VERSION = '1.0.74';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -732,6 +746,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.71"></script>
+<script src="/app.js?v=1.0.74"></script>
 </body>
 </html>

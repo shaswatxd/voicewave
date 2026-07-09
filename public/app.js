@@ -307,6 +307,16 @@
     return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
   }
 
+  // Solid-color variant of AVATAR_COLORS (same hash, same index, matching
+  // starting hex) — gradients can't serve as CSS currentColor for the laser
+  // pointer's box-shadow/label background.
+  const POINTER_COLORS = ['#22d3ee', '#a855f7', '#ec4899', '#22c55e', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6'];
+  function getPointerColor(name) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return POINTER_COLORS[Math.abs(hash) % POINTER_COLORS.length];
+  }
+
   function getInitial(name) {
     return name ? name.charAt(0).toUpperCase() : '?';
   }
@@ -692,7 +702,8 @@
       makingOffer: false,
       ignoreOffer: false,
       pendingCandidates: [],
-      iceDisconnectTimer: null
+      iceDisconnectTimer: null,
+      lastStats: null // { lost, received } from the previous getStats() poll, for interval packet-loss %
     };
     peers[socketId] = peer;
 
@@ -931,29 +942,34 @@
     }
   }
 
-  async function openScreenPicker() {
+  let isSwitchingSource = false; // reuses the picker UI, but routes Go Live to a replaceTrack switch instead of a fresh start
+
+  async function openScreenPicker(switching) {
     if (!window.electronAPI || !window.electronAPI.getScreenSources) {
       toast('Screen share is available in the desktop app only', 'error');
       return;
     }
+    isSwitchingSource = !!switching;
     selectedScreenSource = null;
     $('#screen-picker-share').disabled = true;
-    // Restore last-used quality choices
-    const resSel = $('#picker-resolution');
-    if (resSel) {
-      resSel.value = shareResolution;
-    }
-    const fpsSel = $('#picker-fps');
-    if (fpsSel) {
-      fpsSel.value = String(shareFps);
-    }
-    const optSel = $('#picker-optimize');
-    if (optSel) {
-      optSel.value = shareOptimize;
+    $('#screen-picker-share').textContent = isSwitchingSource ? 'Switch' : 'Go Live';
+    // A switch keeps the original quality/audio policy — only the source changes.
+    const quality = $('.picker-quality-row');
+    const audioRow = $('#picker-audio-row');
+    if (quality) quality.style.display = isSwitchingSource ? 'none' : '';
+    if (!isSwitchingSource) {
+      // Restore last-used quality choices
+      const resSel = $('#picker-resolution');
+      if (resSel) resSel.value = shareResolution;
+      const fpsSel = $('#picker-fps');
+      if (fpsSel) fpsSel.value = String(shareFps);
+      const optSel = $('#picker-optimize');
+      if (optSel) optSel.value = shareOptimize;
+      if (audioRow) audioRow.style.display = navigator.userAgent.includes('Windows') ? 'flex' : 'none';
+    } else if (audioRow) {
+      audioRow.style.display = 'none';
     }
     $('#screen-picker-modal').classList.add('open');
-    const audioRow = $('#picker-audio-row');
-    if (audioRow) audioRow.style.display = navigator.userAgent.includes('Windows') ? 'flex' : 'none';
     await loadScreenSources();
   }
 
@@ -1063,6 +1079,100 @@
     }
   }
 
+  function switchScreenSource() {
+    if (!isScreenSharing) return;
+    openScreenPicker(true);
+  }
+
+  async function performSourceSwitch() {
+    if (!selectedScreenSource || !screenStream) return;
+    const withAudio = screenStream.getAudioTracks().length > 0;
+    $('#screen-picker-modal').classList.remove('open');
+    isSwitchingSource = false;
+    try {
+      window.electronAPI.selectScreenSource(selectedScreenSource, withAudio);
+      const videoConstraints = { frameRate: { ideal: shareFps, max: shareFps } };
+      const res = SHARE_RESOLUTIONS[shareResolution];
+      if (res) {
+        videoConstraints.width = { max: res.width };
+        videoConstraints.height = { max: res.height };
+      }
+      const newStream = await navigator.mediaDevices.getDisplayMedia({ video: videoConstraints, audio: withAudio });
+      await applySourceSwitch(newStream);
+    } catch (err) {
+      console.error('[VoiceWave] screen source switch error:', err);
+      if (err && err.name !== 'NotAllowedError') {
+        toast('Could not switch source: ' + (err.message || err.name), 'error');
+      }
+      // Deliberately no cleanupScreenStream() here — a cancelled/failed
+      // switch must leave the still-active original share untouched.
+    }
+  }
+
+  // Browser path — no custom picker, getDisplayMedia shows the browser's own UI
+  async function switchWebScreenSource() {
+    if (!isScreenSharing || !screenStream) return;
+    const withAudio = screenStream.getAudioTracks().length > 0;
+    try {
+      const newStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: shareFps, max: 60 } },
+        audio: withAudio
+      });
+      await applySourceSwitch(newStream);
+    } catch (err) {
+      console.error('[VoiceWave] web screen source switch error:', err);
+      if (err && err.name !== 'NotAllowedError') {
+        toast('Could not switch source: ' + (err.message || err.name), 'error');
+      }
+    }
+  }
+
+  // Shared by both switch paths: swap the video (and audio, if applicable)
+  // tracks into every existing sender via replaceTrack() — same m-line, no
+  // renegotiation, no new ontrack on receivers, so the switch is visually
+  // transparent to viewers the instant it resolves.
+  async function applySourceSwitch(newStream) {
+    const oldVideoTrack = screenStream.getVideoTracks()[0];
+    const oldAudioTrack = screenStream.getAudioTracks()[0];
+    const newVideoTrack = newStream.getVideoTracks()[0];
+    const newAudioTrack = newStream.getAudioTracks()[0];
+
+    await Promise.all(Object.values(peers).map(peer => {
+      const sender = peer.pc.getSenders().find(s => s.track === oldVideoTrack);
+      return sender && newVideoTrack ? sender.replaceTrack(newVideoTrack).catch(() => {}) : Promise.resolve();
+    }));
+
+    if (oldAudioTrack) {
+      await Promise.all(Object.values(peers).map(peer => {
+        const sender = peer.pc.getSenders().find(s => s.track === oldAudioTrack);
+        return sender ? sender.replaceTrack(newAudioTrack || null).catch(() => {}) : Promise.resolve();
+      }));
+    }
+    // New source has audio but the original share didn't capture any —
+    // adding a fresh sender would need addTrack (which DOES renegotiate),
+    // out of scope for a "switch"; just don't send it.
+    if (!oldAudioTrack && newAudioTrack) newAudioTrack.stop();
+
+    // Clear the handler BEFORE stopping — stopping fires 'onended', which
+    // would otherwise self-trigger a full stopScreenShare() right after a
+    // successful switch.
+    if (oldVideoTrack) { oldVideoTrack.onended = null; oldVideoTrack.stop(); }
+    if (oldAudioTrack) { oldAudioTrack.onended = null; oldAudioTrack.stop(); }
+
+    screenStream = newStream;
+    if (newVideoTrack) {
+      const hint = shareOptimize === 'auto' ? (shareFps >= 60 ? 'motion' : 'detail') : shareOptimize;
+      try { newVideoTrack.contentHint = hint; } catch (e) {}
+      newVideoTrack.onended = () => stopScreenShare();
+    }
+    Object.values(peers).forEach(peer => applyBandwidthLimit(peer.pc));
+
+    if (screenShares[mySocketId]) screenShares[mySocketId].streamId = newStream.id;
+    if (socket && roomId) socket.emit('screen-share-switch', { roomId, streamId: newStream.id });
+    renderScreenShares(); // picks up the new screenStream via getShareStream()
+    toast('Switched source', 'success');
+  }
+
   function beginBroadcastingScreen() {
     if (!screenStream) return;
     isScreenSharing = true;
@@ -1093,6 +1203,44 @@
     if (!silent && socket && roomId) socket.emit('screen-share-stop', { roomId });
     delete screenShares[mySocketId];
     if (focusedShareId === mySocketId) focusedShareId = null;
+    renderScreenShares();
+  }
+
+  // Freeze the stream on the viewer side (video.pause() in renderScreenShares)
+  // rather than disabling the track — a disabled video track still sends
+  // black frames per spec, the opposite of "hold the last real frame."
+  // Bandwidth savings are a free add-on via a sender param trim, not the
+  // mechanism that produces the freeze itself.
+  function togglePauseScreenShare() {
+    if (!isScreenSharing || !screenShares[mySocketId]) return;
+    if (screenShares[mySocketId].paused) resumeScreenShare();
+    else pauseScreenShare();
+  }
+
+  function pauseScreenShare() {
+    const share = screenShares[mySocketId];
+    if (!share || share.paused) return;
+    share.paused = true;
+    Object.values(peers).forEach(peer => {
+      peer.pc.getSenders().forEach(sender => {
+        if (sender.track && sender.track.kind === 'video' && screenStream && screenStream.getTracks().includes(sender.track)) {
+          const params = sender.getParameters();
+          if (!params.encodings || !params.encodings.length) params.encodings = [{}];
+          params.encodings[0].maxFramerate = 1;
+          sender.setParameters(params).catch(() => {});
+        }
+      });
+    });
+    if (socket && roomId) socket.emit('screen-share-pause', { roomId });
+    renderScreenShares();
+  }
+
+  function resumeScreenShare() {
+    const share = screenShares[mySocketId];
+    if (!share || !share.paused) return;
+    share.paused = false;
+    Object.values(peers).forEach(peer => applyBandwidthLimit(peer.pc));
+    if (socket && roomId) socket.emit('screen-share-resume', { roomId });
     renderScreenShares();
   }
 
@@ -1136,6 +1284,7 @@
       if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => {});
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       focusedShareId = null;
+      clearAllPointers();
       return;
     }
 
@@ -1173,20 +1322,39 @@
       // Own preview stays muted so system audio doesn't double up
       video.muted = isLocal || isDeafened;
       video.volume = stageVolume / 100;
-      video.play().catch(() => {
-        const resume = () => {
-          video.play().then(() => document.removeEventListener('click', resume)).catch(() => {});
-        };
-        document.addEventListener('click', resume);
-      });
+      // Paused-aware: this function re-runs on unrelated events too (e.g. a
+      // THIRD person starting their own share re-renders everyone's stage)
+      // — an unconditional .play() here would silently un-pause a share
+      // someone deliberately paused. Only play when not paused; when
+      // paused, let one frame land then freeze (some browsers can't
+      // .pause() a video that's never played).
+      if (share.paused) {
+        if (video.paused === false) video.pause();
+        else if (!video.srcObject || video.readyState < 2) {
+          video.play().then(() => video.pause()).catch(() => {});
+        }
+      } else {
+        video.play().catch(() => {
+          const resume = () => {
+            video.play().then(() => document.removeEventListener('click', resume)).catch(() => {});
+          };
+          document.addEventListener('click', resume);
+        });
+      }
       $('#stage-waiting').classList.remove('show');
+      $('#stage-paused-badge').classList.toggle('show', !!share.paused);
     } else {
       video.srcObject = null;
       $('#stage-waiting').classList.add('show');
+      $('#stage-paused-badge').classList.remove('show');
     }
 
-    // Controls: stop only for your own share; volume only for remote audio
+    // Controls: sharer-only actions; volume only for remote audio
     $('#stage-stop').style.display = isScreenSharing ? 'inline-flex' : 'none';
+    $('#stage-pause').style.display = isLocal && isScreenSharing ? 'inline-flex' : 'none';
+    $('#stage-pause').classList.toggle('active', !!share.paused);
+    $('#stage-pause').title = share.paused ? 'Resume sharing' : 'Pause sharing';
+    $('#stage-switch-source').style.display = isLocal && isScreenSharing ? 'inline-flex' : 'none';
     const volWrap = $('#stage-volume-wrap');
     if (volWrap) volWrap.style.display = isLocal ? 'none' : 'flex';
 
@@ -1226,6 +1394,8 @@
           <span class="stage-thumb-name"></span>
         `;
         tile.addEventListener('click', () => {
+          if (laserPointerActive) emitPointerHide();
+          clearAllPointers();
           focusedShareId = tile.dataset.share;
           renderScreenShares();
         });
@@ -1240,10 +1410,119 @@
         vid.srcObject = stream;
         vid.play().catch(() => {});
       }
+      if (share.paused) { if (vid.paused === false) vid.pause(); }
+      else if (vid.paused) vid.play().catch(() => {});
     });
     strip.querySelectorAll('.stage-thumb').forEach(tile => {
       if (!seen.has(tile.dataset.share)) tile.remove();
     });
+  }
+
+  // ── LASER POINTER ──
+  let laserPointerActive = false;
+  let lastPointerEmitAt = 0;
+  let pointerFadeTimers = {};
+  let pointerResizeObserver = null;
+
+  // #stage-video uses object-fit:contain, so its rendered box is smaller
+  // than the wrap on one axis whenever aspect ratios differ. Compute the
+  // actual video rect in wrap-local coordinates so normalized (0-1) pointer
+  // positions re-project correctly regardless of the viewer's own window size.
+  function getContainedVideoBox(video, wrapRect) {
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh) return { left: 0, top: 0, width: wrapRect.width, height: wrapRect.height };
+    const elAspect = wrapRect.width / wrapRect.height, vidAspect = vw / vh;
+    if (vidAspect > elAspect) {
+      const w = wrapRect.width, h = w / vidAspect;
+      return { left: 0, top: (wrapRect.height - h) / 2, width: w, height: h };
+    }
+    const h = wrapRect.height, w = h * vidAspect;
+    return { left: (wrapRect.width - w) / 2, top: 0, width: w, height: h };
+  }
+
+  function toggleLaserPointer() {
+    laserPointerActive = !laserPointerActive;
+    $('#stage-video-wrap')?.classList.toggle('laser-active', laserPointerActive);
+    $('#stage-laser')?.classList.toggle('laser-on', laserPointerActive);
+    if (!laserPointerActive) emitPointerHide();
+  }
+
+  function handleStageMouseMove(e) {
+    if (!laserPointerActive || !focusedShareId || !socket || !roomId) return;
+    const now = Date.now();
+    if (now - lastPointerEmitAt < 50) return; // ~20Hz — smooth, trivial payload size
+    lastPointerEmitAt = now;
+    const video = $('#stage-video');
+    const wrap = $('#stage-video-wrap');
+    if (!video || !wrap) return;
+    const wrapRect = wrap.getBoundingClientRect();
+    const box = getContainedVideoBox(video, wrapRect);
+    if (!box.width || !box.height) return;
+    const nx = Math.min(1, Math.max(0, (e.clientX - wrapRect.left - box.left) / box.width));
+    const ny = Math.min(1, Math.max(0, (e.clientY - wrapRect.top - box.top) / box.height));
+    socket.emit('pointer-move', { roomId, sharerSocketId: focusedShareId, x: nx, y: ny });
+  }
+
+  function emitPointerHide() {
+    if (socket && roomId && focusedShareId) socket.emit('pointer-hide', { roomId, sharerSocketId: focusedShareId });
+  }
+
+  function positionPointerDot(dot) {
+    const video = $('#stage-video');
+    const wrap = $('#stage-video-wrap');
+    if (!video || !wrap) return;
+    const box = getContainedVideoBox(video, wrap.getBoundingClientRect());
+    dot.style.left = `${box.left + parseFloat(dot.dataset.nx) * box.width}px`;
+    dot.style.top = `${box.top + parseFloat(dot.dataset.ny) * box.height}px`;
+  }
+
+  function renderPointerDot(data) {
+    const layer = $('#stage-pointer-layer');
+    if (!layer || data.socketId === mySocketId) return;
+    let dot = layer.querySelector(`[data-pointer="${data.socketId}"]`);
+    if (!dot) {
+      dot = document.createElement('div');
+      dot.className = 'pointer-dot';
+      dot.dataset.pointer = data.socketId;
+      dot.innerHTML = `<span class="pointer-label"></span>`;
+      layer.appendChild(dot);
+      ensurePointerResizeObserver();
+    }
+    dot.style.color = getPointerColor(data.name);
+    dot.dataset.nx = data.x;
+    dot.dataset.ny = data.y;
+    dot.querySelector('.pointer-label').textContent = data.name;
+    dot.classList.remove('fading');
+    positionPointerDot(dot);
+
+    clearTimeout(pointerFadeTimers[data.socketId]);
+    pointerFadeTimers[data.socketId] = setTimeout(() => dot.classList.add('fading'), 1000);
+  }
+
+  function removePointerDot(socketId) {
+    clearTimeout(pointerFadeTimers[socketId]);
+    delete pointerFadeTimers[socketId];
+    $('#stage-pointer-layer')?.querySelector(`[data-pointer="${socketId}"]`)?.remove();
+  }
+
+  function clearAllPointers() {
+    Object.keys(pointerFadeTimers).forEach(id => clearTimeout(pointerFadeTimers[id]));
+    pointerFadeTimers = {};
+    const layer = $('#stage-pointer-layer');
+    if (layer) layer.innerHTML = '';
+  }
+
+  // A stationary pointer between throttled emits would go stale for up to
+  // ~1s if the viewer's own window resizes — one shared observer re-runs
+  // the position math for whatever dots currently exist (cheap, at most a handful).
+  function ensurePointerResizeObserver() {
+    if (pointerResizeObserver || !window.ResizeObserver) return;
+    const wrap = $('#stage-video-wrap');
+    if (!wrap) return;
+    pointerResizeObserver = new ResizeObserver(() => {
+      $('#stage-pointer-layer')?.querySelectorAll('.pointer-dot').forEach(positionPointerDot);
+    });
+    pointerResizeObserver.observe(wrap);
   }
 
   function updateUserCardAudio(socketId, stream) {
@@ -1574,21 +1853,45 @@
         try {
           const stats = await pc.getStats();
           let rtt = 0;
+          let lost = 0, received = 0;
           stats.forEach(report => {
             if (report.type === 'candidate-pair' && report.state === 'succeeded') {
               rtt = report.currentRoundTripTime * 1000;
             }
+            // Sum both audio (always present, at least recvonly) and video
+            // (present while a screen share is flowing) inbound streams —
+            // a fuller signal than audio alone during an active share.
+            if (report.type === 'inbound-rtp' && (report.kind === 'audio' || report.kind === 'video')) {
+              lost += report.packetsLost || 0;
+              received += report.packetsReceived || 0;
+            }
           });
+
+          // Cumulative counters since connect — diff against the last poll
+          // for an INTERVAL loss %, not a lifetime average (a lifetime ratio
+          // would permanently discolor the badge after one early hiccup on
+          // a long call). No baseline yet on the first poll → treat as 0,
+          // same "unknown isn't bad" philosophy as rtt === 0 below.
+          let lossPct = 0;
+          if (peer.lastStats) {
+            const deltaLost = Math.max(0, lost - peer.lastStats.lost);
+            const deltaReceived = Math.max(0, received - peer.lastStats.received);
+            const deltaTotal = deltaLost + deltaReceived;
+            if (deltaTotal > 0) lossPct = (deltaLost / deltaTotal) * 100;
+          }
+          peer.lastStats = { lost, received };
+
           const card = $(`[data-socket="${socketId}"]`);
           if (card) {
             const qualityIndicator = card.querySelector('.connection-quality');
             if (qualityIndicator) {
               qualityIndicator.className = 'connection-quality';
-              if (rtt > 0) {
-                if (rtt < 100) qualityIndicator.classList.add('good');
-                else if (rtt < 240) qualityIndicator.classList.add('fair');
-                else qualityIndicator.classList.add('poor');
-                qualityIndicator.title = `Ping: ${Math.round(rtt)}ms`;
+              if (rtt > 0 || lossPct > 0) {
+                // Worst-of-both — either dimension alone can ruin a call.
+                if (rtt >= 240 || lossPct >= 8) qualityIndicator.classList.add('poor');
+                else if (rtt >= 100 || lossPct >= 3) qualityIndicator.classList.add('fair');
+                else qualityIndicator.classList.add('good');
+                qualityIndicator.title = `Ping: ${Math.round(rtt)}ms · Loss: ${lossPct.toFixed(1)}%`;
               } else {
                 qualityIndicator.classList.add('good');
               }
@@ -2018,6 +2321,7 @@
       UI_SOUNDS.play('leave');
       const name = peers[data.socketId]?.name || 'Someone';
       removePeerFromGrid(data.socketId);
+      removePointerDot(data.socketId); // in case they were pointing at whatever we're watching
       // Drop any stream they were sharing
       if (screenShares[data.socketId]) {
         delete screenShares[data.socketId];
@@ -2155,6 +2459,7 @@
     socket.on('chat-message-edited', (data) => {
       const msgEl = $(`[data-msgid="${data.msgId}"]`);
       if (!msgEl) return;
+      msgEl.dataset.rawText = data.text || '';
       const editInput = msgEl.querySelector('.chat-msg-edit-input');
       const textHtml = `${formatMessageText(data.text)} <span class="chat-msg-edited-tag">(edited)</span>`;
       if (editInput) {
@@ -2268,6 +2573,31 @@
       if (focusedShareId === data.sharerSocketId) updateWatcherBadge();
     });
 
+    socket.on('screen-share-paused', (data) => {
+      if (screenShares[data.socketId]) {
+        screenShares[data.socketId].paused = true;
+        if (focusedShareId === data.socketId || data.socketId === mySocketId) renderScreenShares();
+      }
+    });
+
+    socket.on('screen-share-resumed', (data) => {
+      if (screenShares[data.socketId]) {
+        screenShares[data.socketId].paused = false;
+        if (focusedShareId === data.socketId || data.socketId === mySocketId) renderScreenShares();
+      }
+    });
+
+    socket.on('screen-share-switched', (data) => {
+      // Bookkeeping only — replaceTrack() means the receiver's existing
+      // <video> just shows new pixels with no ontrack/renegotiation, so
+      // there's nothing to re-render, just keep the streamId identity in
+      // sync for isScreen classification.
+      if (screenShares[data.socketId]) screenShares[data.socketId].streamId = data.streamId;
+    });
+
+    socket.on('pointer-move', (data) => renderPointerDot(data));
+    socket.on('pointer-hide', (data) => removePointerDot(data.socketId));
+
     socket.on('screen-share-denied', (data) => {
       const msg = data && data.reason === 'limit'
         ? `Stream limit reached (${data.max} at once) — try again when someone stops`
@@ -2325,13 +2655,46 @@
     });
   }
 
+  // Lightweight markdown — bold/italic/strikethrough/code/quote/spoiler.
+  // No real language-aware syntax highlighting (would need a library this
+  // app doesn't depend on); code blocks/spans just get monospace styling.
+  // Returns { html, codeStash } — html still has \x00CODE<n>\x00 placeholders;
+  // callers must restore them LAST, after mentions/linkify, so nothing else
+  // (a mention, a URL) can reach inside code content. Restoring early would
+  // defeat the whole point of protecting it.
+  function parseMarkdown(escapedHtml) {
+    const codeStash = [];
+    const stash = (html) => { codeStash.push(html); return `\x00CODE${codeStash.length - 1}\x00`; };
+
+    let out = escapedHtml
+      .replace(/```\w*\n?([\s\S]*?)```/g, (m, code) => stash(`<pre class="chat-code-block"><code>${code}</code></pre>`))
+      .replace(/`([^`\n]+)`/g, (m, code) => stash(`<code class="chat-inline-code">${code}</code>`));
+
+    // Blockquote — "&gt; text" (post-escape) at the start of a line
+    out = out.replace(/^&gt; ?(.*)$/gm, '<blockquote class="chat-quote">$1</blockquote>');
+
+    out = out
+      .replace(/\*\*([^\n*]+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__([^\n_]+?)__/g, '<strong>$1</strong>')
+      .replace(/\*([^\n*]+?)\*/g, '<em>$1</em>')
+      .replace(/(?<!\w)_([^\n_]+?)_(?!\w)/g, '<em>$1</em>')
+      .replace(/~~([^\n~]+?)~~/g, '<del>$1</del>')
+      .replace(/\|\|([^\n|]+?)\|\|/g, '<span class="chat-spoiler" onclick="this.classList.add(\'revealed\')" title="Click to reveal">$1</span>');
+
+    return { html: out, codeStash };
+  }
+
   function formatMessageText(text) {
-    // Escape first, mention-highlight, THEN linkify — in that order so the
-    // URL regex (which stops at "<") never straddles a mention span's tags.
+    // Escape → markdown (code protected via placeholders) → mentions →
+    // linkify → restore code LAST — so a mention or URL regex can never
+    // reach inside code content, and the URL regex (which stops at "<")
+    // never straddles a mention/markdown tag either.
     const escaped = escapeHtml(text || '');
-    const mentioned = highlightMentions(escaped);
-    return mentioned.replace(/(https?:\/\/[^\s<]+)/g,
+    const { html, codeStash } = parseMarkdown(escaped);
+    const mentioned = highlightMentions(html);
+    const linked = mentioned.replace(/(https?:\/\/[^\s<]+)/g,
       (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-link">${url}</a>`);
+    return linked.replace(/\x00CODE(\d+)\x00/g, (m, i) => codeStash[Number(i)]);
   }
 
   function isChatNearBottom(container) {
@@ -2355,6 +2718,7 @@
     const el = document.createElement('div');
     el.className = `chat-msg${isOwn ? ' own' : ''}${data.isWhisper ? ' whisper' : ''}${isMentioned ? ' mentioned' : ''}`;
     el.dataset.msgid = data.msgId;
+    el.dataset.rawText = data.text || ''; // pre-markdown source, so edit/reply don't operate on rendered (formatted) text
 
     let senderAvatar = isOwn ? userAvatar : (peers[data.socketId]?.avatar || null);
     const avatarHtml = senderAvatar
@@ -2438,7 +2802,10 @@
     if (!msgEl) return;
     const textEl = msgEl.querySelector('.chat-msg-text');
     if (!textEl || textEl.querySelector('.chat-msg-edit-input')) return;
-    const currentText = textEl.textContent.replace(/\(edited\)\s*$/, '').trim();
+    // Raw pre-markdown source, not the rendered .textContent — otherwise
+    // editing a "**bold**" message would silently strip the markdown syntax
+    // (textContent only has the rendered "bold", not the original stars).
+    const currentText = msgEl.dataset.rawText || '';
 
     const input = document.createElement('input');
     input.type = 'text';
@@ -2449,8 +2816,14 @@
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
 
+    // Removing a focused input from the DOM fires 'blur' synchronously,
+    // re-entering finish() a second time before input.isConnected has
+    // updated — guard with a flag, not just the isConnected check, so
+    // Escape (which replaces the input) can't trigger a double replaceWith().
+    let finished = false;
     const finish = (save) => {
-      if (!input.isConnected) return;
+      if (finished || !input.isConnected) return;
+      finished = true;
       const newText = input.value.trim();
       if (save && newText && newText !== currentText) {
         socket.emit('edit-chat-message', { roomId, msgId, text: newText });
@@ -3205,10 +3578,19 @@
 
     $('#screen-picker-cancel')?.addEventListener('click', () => {
       $('#screen-picker-modal').classList.remove('open');
+      isSwitchingSource = false;
     });
-    $('#screen-picker-share')?.addEventListener('click', startScreenShare);
+    $('#screen-picker-share')?.addEventListener('click', () => {
+      if (isSwitchingSource) performSourceSwitch();
+      else startScreenShare();
+    });
 
     $('#stage-stop')?.addEventListener('click', () => stopScreenShare());
+    $('#stage-pause')?.addEventListener('click', () => togglePauseScreenShare());
+    $('#stage-switch-source')?.addEventListener('click', () => {
+      if (window.electronAPI && window.electronAPI.isElectron) switchScreenSource();
+      else switchWebScreenSource();
+    });
     $('#stage-fullscreen')?.addEventListener('click', () => {
       const wrap = $('#stage-video-wrap');
       if (document.fullscreenElement) {
@@ -3234,6 +3616,10 @@
         console.warn('[VoiceWave] PiP error:', err);
       }
     });
+
+    $('#stage-laser')?.addEventListener('click', () => toggleLaserPointer());
+    $('#stage-video-wrap')?.addEventListener('mousemove', handleStageMouseMove);
+    $('#stage-video-wrap')?.addEventListener('mouseleave', () => { if (laserPointerActive) emitPointerHide(); });
 
     // Per-stream volume (remote shares only; own preview is always muted)
     const stageVolSlider = $('#stage-volume');
@@ -3530,6 +3916,8 @@
       if (liveCard && !e.target.closest('.user-actions')) {
         const socketId = liveCard.dataset.socket;
         if (screenShares[socketId]) {
+          if (laserPointerActive) emitPointerHide();
+          clearAllPointers();
           focusedShareId = socketId;
           renderScreenShares();
         }
@@ -3774,7 +4162,7 @@
         const msgId = actReply.dataset.actReply;
         const msgEl = $(`[data-msgid="${msgId}"]`);
         const author = msgEl.querySelector('.chat-msg-name')?.textContent || 'User';
-        const text = msgEl.querySelector('.chat-msg-text')?.textContent || '';
+        const text = msgEl.dataset.rawText || ''; // raw source, not rendered markdown
 
         replyingTo = { msgId, name: author, text };
         $('#reply-banner-text').textContent = `Replying to @${author}: "${text.slice(0, 30)}..."`;
