@@ -3410,8 +3410,6 @@
       cancelReply();
     }
 
-
-
     if (pendingFile) {
       const isVideo = pendingFile.type?.startsWith('video/');
       const isElectron = !!(window.electronAPI && window.electronAPI.isElectron);
@@ -4284,7 +4282,6 @@
           socket.emit('force-mute', { roomId, targetId });
         }
       }
-
 
       // 7. Message Action: Delete Message
       const actDel = e.target.closest('[data-act-del]');
