@@ -449,6 +449,12 @@ autoUpdater.requestHeaders = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
   'Pragma': 'no-cache'
 };
+autoUpdater.setFeedURL({
+  provider: 'github',
+  owner: 'shaswatxd',
+  repo: 'voicewave',
+  releaseType: 'release'
+});
 
 function setupAutoUpdater() {
   autoUpdater.on('checking-for-update', () => {
