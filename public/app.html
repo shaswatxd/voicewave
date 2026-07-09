@@ -13,7 +13,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.74">
+<link rel="stylesheet" href="/app.css?v=1.0.76">
 <!-- Consolidated Styles moved to app.css -->
 </head>
 <body>
@@ -256,7 +256,7 @@
           <div id="stage-pointer-layer"></div>
           <div class="stage-waiting" id="stage-waiting">
             <div class="connecting-spinner" style="width:36px;height:36px;"></div>
-            <span>Connecting to stream…</span>
+            <span id="stage-waiting-text">Connecting to stream…</span>
           </div>
           <div class="stage-paused-badge" id="stage-paused-badge">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
@@ -460,6 +460,12 @@
         <label class="toggle-label">
           <input type="checkbox" id="setting-low-bandwidth">
           <span>Low Bandwidth Mode</span>
+        </label>
+      </div>
+      <div class="setting-item setting-toggle">
+        <label class="toggle-label">
+          <input type="checkbox" id="setting-manual-share-focus">
+          <span>Don't auto-open shared screens (click to watch)</span>
         </label>
       </div>
 
@@ -700,7 +706,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.74';
+  window.APP_VERSION = '1.0.76';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -746,6 +752,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.74"></script>
+<script src="/app.js?v=1.0.76"></script>
 </body>
 </html>

@@ -133,6 +133,11 @@
   let noiseGateNode = null;
   let micDestinationNode = null;
   let processedMicTrack = null;
+  // Independent, always-enabled tap for the Settings "Mic Test" visualizer —
+  // separate from the outgoing chain so mute/PTT (which disable the real
+  // localStream track) don't make the test bars look dead/broken.
+  let micTestSourceNode = null;
+  let micTestTrack = null;
   let usingWorkletGate = false;
   let audioWorkletModulePromise = null;
   let fallbackGateAnalyser = null;
@@ -229,6 +234,9 @@
   let focusedShareId = null;    // which share is on the big stage
   let watcherCounts = {};       // sharerSocketId -> live viewer count (Discord Go-Live style)
   let lastWatchingEmit = undefined; // last focusedShareId we told the server we're watching
+  let connectingWaitTimer = null; // "still connecting" message escalation for the stage-waiting spinner
+  let connectingWaitFor = null;
+  let manualShareFocus = localStorage.getItem('vw_manual_share_focus') === '1'; // opt-in: don't auto-open others' shares
   let stageVolume = parseInt(localStorage.getItem('vw_stage_volume') || '100');
   let shareResolution = localStorage.getItem('vw_share_res') || '1080';
   let shareFps = parseInt(localStorage.getItem('vw_share_fps') || '30');
@@ -541,15 +549,18 @@
 
   function teardownMicPipeline() {
     if (fallbackGateInterval) { clearInterval(fallbackGateInterval); fallbackGateInterval = null; }
-    [micSourceNode, micGainNode, analyserNode, noiseGateNode, fallbackGateAnalyser, micDestinationNode].forEach(node => {
+    [micSourceNode, micGainNode, analyserNode, noiseGateNode, fallbackGateAnalyser, micDestinationNode, micTestSourceNode].forEach(node => {
       if (node) { try { node.disconnect(); } catch (e) {} }
     });
     if (processedMicTrack) { try { processedMicTrack.stop(); } catch (e) {} }
+    if (micTestTrack) { try { micTestTrack.stop(); } catch (e) {} }
     micSourceNode = null;
     noiseGateNode = null;
     fallbackGateAnalyser = null;
     micDestinationNode = null;
     processedMicTrack = null;
+    micTestSourceNode = null;
+    micTestTrack = null;
   }
 
   async function createNoiseGateNode(ctx) {
@@ -620,7 +631,16 @@
     analyserNode.smoothingTimeConstant = 0.8;
 
     micSourceNode.connect(micGainNode);
-    micGainNode.connect(analyserNode); // unchanged: local UI level-meter tap
+
+    // Mic Test tap: a cloned track has its own independent enabled state,
+    // so muting yourself (or idle PTT) doesn't silence the test visualizer.
+    const rawTrack = localStream.getAudioTracks()[0];
+    if (rawTrack) {
+      micTestTrack = rawTrack.clone();
+      micTestTrack.enabled = true;
+      micTestSourceNode = ctx.createMediaStreamSource(new MediaStream([micTestTrack]));
+      micTestSourceNode.connect(analyserNode);
+    }
 
     noiseGateNode = await createNoiseGateNode(ctx);
     micGainNode.connect(noiseGateNode);
@@ -703,7 +723,9 @@
       ignoreOffer: false,
       pendingCandidates: [],
       iceDisconnectTimer: null,
-      lastStats: null // { lost, received } from the previous getStats() poll, for interval packet-loss %
+      lastStats: null, // { lost, received } from the previous getStats() poll, for interval packet-loss %
+      isRelayed: false,   // set once getStats() shows the active candidate pair is a TURN relay
+      restartTimestamps: [] // recent restartIce() calls, to detect + break a reconnect loop
     };
     peers[socketId] = peer;
 
@@ -720,7 +742,7 @@
       // No mic yet — still open a receive-only channel so we can hear others
       pc.addTransceiver('audio', { direction: 'recvonly' });
     }
-    applyBandwidthLimit(pc);
+    applyBandwidthLimit(pc, peer);
 
     pc.onnegotiationneeded = async () => {
       try {
@@ -767,7 +789,7 @@
           // Tracks can land before the socket announcement — register a placeholder
           screenShares[socketId] = { socketId, name: peer.name || 'Someone', streamId: stream.id };
         }
-        if (!focusedShareId) focusedShareId = socketId;
+        if (!focusedShareId && !manualShareFocus) focusedShareId = socketId;
         renderScreenShares();
         return;
       }
@@ -775,6 +797,26 @@
       updateUserCardAudio(socketId, stream);
       setupRemoteAnalyser(socketId, stream);
     };
+
+    // Guards a bad path (e.g. a congested TURN relay) from restarting on an
+    // endless disconnected → restart → disconnected cycle — a real "loop"
+    // symptom, not just a stuck spinner. After too many restarts in a short
+    // window we stop auto-restarting and tell the user plainly instead of
+    // silently retrying forever.
+    function tryRestartIce(reason) {
+      const now = Date.now();
+      peer.restartTimestamps = peer.restartTimestamps.filter(t => now - t < 30000);
+      if (peer.restartTimestamps.length >= 4) {
+        if (!peer.reconnectGaveUp) {
+          peer.reconnectGaveUp = true;
+          toast(`Having trouble staying connected to ${name} — their network connection may be unstable.`, 'error');
+        }
+        return;
+      }
+      peer.restartTimestamps.push(now);
+      peer.reconnectGaveUp = false;
+      try { pc.restartIce(); } catch (e) {}
+    }
 
     pc.oniceconnectionstatechange = () => {
       const state = pc.iceConnectionState;
@@ -785,18 +827,22 @@
         // without restarting on every transient blip.
         clearTimeout(peer.iceDisconnectTimer);
         peer.iceDisconnectTimer = setTimeout(() => {
-          if (pc.iceConnectionState === 'disconnected') pc.restartIce();
+          if (pc.iceConnectionState === 'disconnected') tryRestartIce('disconnected-timeout');
         }, 3000);
       } else {
         clearTimeout(peer.iceDisconnectTimer);
-        if (state === 'failed') pc.restartIce();
+        if (state === 'failed') tryRestartIce('failed');
+        if (state === 'connected' || state === 'completed') {
+          peer.restartTimestamps = [];
+          peer.reconnectGaveUp = false;
+        }
       }
     };
 
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'failed') {
         toast(`Connection to ${name} lost, reconnecting...`, 'error');
-        pc.restartIce();
+        tryRestartIce('connectionstate-failed');
       }
     };
 
@@ -816,7 +862,7 @@
     return row[shareFps] || row[30];
   }
 
-  function applyBandwidthLimit(pc) {
+  function applyBandwidthLimit(pc, peer) {
     pc.getSenders().forEach(sender => {
       if (!sender.track) return;
       const params = sender.getParameters();
@@ -824,7 +870,13 @@
       if (sender.track.kind === 'audio') {
         params.encodings[0].maxBitrate = lowBandwidthEnabled ? 16000 : 128000;
       } else if (sender.track.kind === 'video') {
-        params.encodings[0].maxBitrate = currentShareBitrate(); // screen share
+        let bitrate = currentShareBitrate(); // screen share
+        // The free/shared public TURN relay can't reliably sustain a high
+        // screen-share bitrate — cap lower for a peer we've detected is
+        // routed through it (see startQualityMonitoring), instead of the
+        // connection silently stalling / cycling reconnects under congestion.
+        if (peer && peer.isRelayed) bitrate = Math.min(bitrate, 1200000);
+        params.encodings[0].maxBitrate = bitrate;
         // Keep resolution crisp and let the encoder drop frames first for
         // text content; for motion content prefer smooth frame rate.
         params.degradationPreference = (shareOptimize === 'motion' || (shareOptimize === 'auto' && shareFps >= 60))
@@ -854,7 +906,7 @@
       } else if (track) {
         pc.addTrack(track, stream);
       }
-      applyBandwidthLimit(pc);
+      applyBandwidthLimit(pc, peer);
     }
   }
 
@@ -1165,7 +1217,7 @@
       try { newVideoTrack.contentHint = hint; } catch (e) {}
       newVideoTrack.onended = () => stopScreenShare();
     }
-    Object.values(peers).forEach(peer => applyBandwidthLimit(peer.pc));
+    Object.values(peers).forEach(peer => applyBandwidthLimit(peer.pc, peer));
 
     if (screenShares[mySocketId]) screenShares[mySocketId].streamId = newStream.id;
     if (socket && roomId) socket.emit('screen-share-switch', { roomId, streamId: newStream.id });
@@ -1178,7 +1230,7 @@
     isScreenSharing = true;
     Object.values(peers).forEach(peer => {
       screenStream.getTracks().forEach(track => peer.pc.addTrack(track, screenStream));
-      applyBandwidthLimit(peer.pc);
+      applyBandwidthLimit(peer.pc, peer);
     });
     screenShares[mySocketId] = screenShares[mySocketId] ||
       { socketId: mySocketId, name: window.userName || 'You', streamId: screenStream.id };
@@ -1239,7 +1291,7 @@
     const share = screenShares[mySocketId];
     if (!share || !share.paused) return;
     share.paused = false;
-    Object.values(peers).forEach(peer => applyBandwidthLimit(peer.pc));
+    Object.values(peers).forEach(peer => applyBandwidthLimit(peer.pc, peer));
     if (socket && roomId) socket.emit('screen-share-resume', { roomId });
     renderScreenShares();
   }
@@ -1261,6 +1313,29 @@
   function getShareStream(socketId) {
     if (socketId === mySocketId) return screenStream;
     return remoteScreenStreams[socketId] || null;
+  }
+
+  // "Connecting to stream" is normal for the first second or two, but if it
+  // never resolves (e.g. a peer stuck behind a congested TURN relay) a bare
+  // spinner forever looks broken rather than slow. Escalate the message
+  // after a while instead of leaving it looking silently stuck.
+  function clearConnectingWaitTimer() {
+    if (connectingWaitTimer) { clearTimeout(connectingWaitTimer); connectingWaitTimer = null; }
+    connectingWaitFor = null;
+    const txt = $('#stage-waiting-text');
+    if (txt) txt.textContent = 'Connecting to stream…';
+  }
+
+  function armConnectingWaitTimer(shareId) {
+    if (connectingWaitFor === shareId) return; // already waiting on this one
+    clearConnectingWaitTimer();
+    connectingWaitFor = shareId;
+    connectingWaitTimer = setTimeout(() => {
+      const txt = $('#stage-waiting-text');
+      if (txt && connectingWaitFor === shareId) {
+        txt.textContent = 'Still connecting… their network connection may be slow or unstable.';
+      }
+    }, 12000);
   }
 
   function renderScreenShares() {
@@ -1285,16 +1360,45 @@
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       focusedShareId = null;
       clearAllPointers();
+      clearConnectingWaitTimer();
       return;
     }
 
-    // Make sure something valid is focused
-    if (!focusedShareId || !screenShares[focusedShareId]) {
+    // Make sure something valid is focused. In manual "click to view" mode,
+    // don't auto-jump to someone else's share — leave the stage unfocused
+    // (a "pick a stream" prompt) until the viewer explicitly clicks a thumb.
+    // Your OWN share (mySocketId) is exempt — that's your own action, not
+    // an auto-displayed share of someone else's screen.
+    if (focusedShareId && !screenShares[focusedShareId]) focusedShareId = null;
+    if (!focusedShareId && (!manualShareFocus || shares.length === 1 && shares[0].socketId === mySocketId)) {
       focusedShareId = shares[0].socketId;
     }
 
     stage.classList.add('active');
     room.classList.add('has-stage');
+
+    if (!focusedShareId) {
+      // Manual mode, multiple shares live, nothing clicked yet — prompt to
+      // pick one instead of auto-opening someone's screen for the viewer.
+      $('#stage-sharer-name').textContent = `${shares.length} streams live — click one below to watch`;
+      const countEl = $('#stage-count');
+      if (countEl) countEl.style.display = 'none';
+      const video = $('#stage-video');
+      video.srcObject = null;
+      $('#stage-waiting').classList.add('show', 'picker-mode');
+      $('#stage-paused-badge').classList.remove('show');
+      const waitingTxt = $('#stage-waiting-text');
+      if (waitingTxt) waitingTxt.textContent = 'Click a stream below to watch';
+      $('#stage-stop').style.display = isScreenSharing ? 'inline-flex' : 'none';
+      $('#stage-pause').style.display = 'none';
+      $('#stage-switch-source').style.display = 'none';
+      const volWrap = $('#stage-volume-wrap');
+      if (volWrap) volWrap.style.display = 'none';
+      clearConnectingWaitTimer();
+      renderStageThumbs(shares);
+      return;
+    }
+    $('#stage-waiting').classList.remove('picker-mode');
 
     const share = screenShares[focusedShareId];
     const isLocal = focusedShareId === mySocketId;
@@ -1343,10 +1447,12 @@
       }
       $('#stage-waiting').classList.remove('show');
       $('#stage-paused-badge').classList.toggle('show', !!share.paused);
+      clearConnectingWaitTimer();
     } else {
       video.srcObject = null;
       $('#stage-waiting').classList.add('show');
       $('#stage-paused-badge').classList.remove('show');
+      armConnectingWaitTimer(focusedShareId);
     }
 
     // Controls: sharer-only actions; volume only for remote audio
@@ -1372,7 +1478,10 @@
   function renderStageThumbs(shares) {
     const strip = $('#stage-thumbs');
     if (!strip) return;
-    if (shares.length < 2) {
+    // Nothing focused (manual click-to-view, unpicked) — always show the
+    // strip, even for a single share, so there's something to click.
+    const needsPicker = !focusedShareId;
+    if (shares.length < 2 && !needsPicker) {
       strip.style.display = 'none';
       strip.innerHTML = '';
       return;
@@ -1854,9 +1963,16 @@
           const stats = await pc.getStats();
           let rtt = 0;
           let lost = 0, received = 0;
+          let activeLocalId = null, activeRemoteId = null;
+          const candidateTypes = {};
           stats.forEach(report => {
             if (report.type === 'candidate-pair' && report.state === 'succeeded') {
               rtt = report.currentRoundTripTime * 1000;
+              activeLocalId = report.localCandidateId;
+              activeRemoteId = report.remoteCandidateId;
+            }
+            if (report.type === 'local-candidate' || report.type === 'remote-candidate') {
+              candidateTypes[report.id] = report.candidateType;
             }
             // Sum both audio (always present, at least recvonly) and video
             // (present while a screen share is flowing) inbound streams —
@@ -1866,6 +1982,19 @@
               received += report.packetsReceived || 0;
             }
           });
+
+          // Free/shared public TURN relay can't reliably sustain a high
+          // screen-share bitrate — once we can see this peer's active path
+          // is a relay, cap their video bitrate lower (applyBandwidthLimit)
+          // instead of letting a congested relay silently stall/loop the
+          // connection under a bitrate it was never going to sustain.
+          const nowRelayed = candidateTypes[activeLocalId] === 'relay' || candidateTypes[activeRemoteId] === 'relay';
+          if (nowRelayed && !peer.isRelayed) {
+            peer.isRelayed = true;
+            applyBandwidthLimit(pc, peer);
+          } else if (!nowRelayed) {
+            peer.isRelayed = false;
+          }
 
           // Cumulative counters since connect — diff against the last poll
           // for an INTERVAL loss %, not a lifetime average (a lifetime ratio
@@ -3442,6 +3571,11 @@
       soundNotifyCheck.checked = soundNotifications;
     }
 
+    const manualShareFocusCheck = $('#setting-manual-share-focus');
+    if (manualShareFocusCheck) {
+      manualShareFocusCheck.checked = manualShareFocus;
+    }
+
     const statusTextInput = $('#profile-status-text');
     if (statusTextInput) {
       statusTextInput.value = myStatusText;
@@ -3526,7 +3660,7 @@
     // Low bandwidth toggle
     $('#setting-low-bandwidth')?.addEventListener('change', (e) => {
       lowBandwidthEnabled = e.target.checked;
-      Object.values(peers).forEach(peer => applyBandwidthLimit(peer.pc));
+      Object.values(peers).forEach(peer => applyBandwidthLimit(peer.pc, peer));
       toast(lowBandwidthEnabled ? 'Low Bandwidth Mode Active' : 'Normal Bandwidth Mode Active', 'info');
     });
 
@@ -4030,6 +4164,12 @@
     $('#setting-sound-notifications')?.addEventListener('change', (e) => {
       soundNotifications = e.target.checked;
       localStorage.setItem('vw_sound_notifications', soundNotifications);
+    });
+
+    $('#setting-manual-share-focus')?.addEventListener('change', (e) => {
+      manualShareFocus = e.target.checked;
+      localStorage.setItem('vw_manual_share_focus', manualShareFocus ? '1' : '0');
+      if (Object.keys(screenShares).length) renderScreenShares();
     });
 
     $('#profile-status-text')?.addEventListener('input', (e) => {

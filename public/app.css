@@ -1535,6 +1535,10 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
   background: rgba(0,0,0,0.55);
 }
 .stage-waiting.show { display: flex; }
+/* Picker-mode: prompting to click a thumbnail, not actually connecting —
+   no spinner, and the text reads as an instruction rather than a status. */
+.stage-waiting.picker-mode .connecting-spinner { display: none; }
+.stage-waiting.picker-mode span { font-size: 0.95rem; color: var(--text); }
 .stage-video-wrap:fullscreen { background: #000; }
 .stage-video-wrap:fullscreen video { object-fit: contain; }
 
