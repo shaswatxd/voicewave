@@ -798,7 +798,9 @@
       iceDisconnectTimer: null,
       lastStats: null, // { lost, received } from the previous getStats() poll, for interval packet-loss %
       isRelayed: false,   // set once getStats() shows the active candidate pair is a TURN relay
-      restartTimestamps: [] // recent restartIce() calls, to detect + break a reconnect loop
+      restartTimestamps: [], // recent restartIce() calls, to detect + break a reconnect loop
+      screenSenders: null,  // { video, audio } RTCRtpSenders carrying our screen share to this peer
+      wantsScreenShare: true // whether this peer is actually focused on our share (see setPeerScreenSenderActive)
     };
     peers[socketId] = peer;
 
@@ -809,7 +811,11 @@
       addedTracks++;
     }
     if (isScreenSharing && screenStream) {
-      screenStream.getTracks().forEach(track => { pc.addTrack(track, screenStream); addedTracks++; });
+      peer.screenSenders = {};
+      screenStream.getTracks().forEach(track => {
+        peer.screenSenders[track.kind] = pc.addTrack(track, screenStream);
+        addedTracks++;
+      });
     }
     if (isSharingDeviceAudio && deviceAudioStream) {
       deviceAudioStream.getTracks().forEach(track => { pc.addTrack(track, deviceAudioStream); addedTracks++; });
@@ -969,6 +975,26 @@
   // setting is. Scale the *encoded* output down (not the capture) so the
   // same capped bitrate lands on fewer pixels and looks sharp instead.
   const RELAY_SCALE_DOWN = { '720': 1, '1080': 1.5, '1440': 2, 'source': 2.5 };
+
+  // Mesh sends full-quality video to every peer regardless of whether they're
+  // actually looking at it — a viewer only ever focuses one share at a time
+  // (see focusedShareId), so once the server tells us (via 'viewer-focus-changed')
+  // that a specific peer looked away, stop sending them our video entirely
+  // instead of wasting upload on a stream nobody's rendering. replaceTrack(null)
+  // halts sending with no renegotiation; resuming just replaces the track back in.
+  function setPeerScreenSenderActive(viewerSocketId, active) {
+    const peer = peers[viewerSocketId];
+    if (!peer || !peer.screenSenders) return;
+    peer.wantsScreenShare = active;
+    const videoSender = peer.screenSenders.video;
+    if (videoSender) {
+      videoSender.replaceTrack(active && screenStream ? screenStream.getVideoTracks()[0] || null : null).catch(() => {});
+    }
+    const audioSender = peer.screenSenders.audio;
+    if (audioSender) {
+      audioSender.replaceTrack(active && screenStream ? screenStream.getAudioTracks()[0] || null : null).catch(() => {});
+    }
+  }
 
   function applyBandwidthLimit(pc, peer) {
     pc.getSenders().forEach(sender => {
@@ -1357,15 +1383,23 @@
     const newVideoTrack = newStream.getVideoTracks()[0];
     const newAudioTrack = newStream.getAudioTracks()[0];
 
+    // Use the tracked sender refs, not a lookup by current track — a peer
+    // we've paused (setPeerScreenSenderActive) has sender.track === null
+    // right now, so matching against oldVideoTrack would silently skip
+    // them and they'd never pick up the switched source once they refocus.
     await Promise.all(Object.values(peers).map(peer => {
-      const sender = peer.pc.getSenders().find(s => s.track === oldVideoTrack);
-      return sender && newVideoTrack ? sender.replaceTrack(newVideoTrack).catch(() => {}) : Promise.resolve();
+      const sender = peer.screenSenders && peer.screenSenders.video;
+      if (!sender || !newVideoTrack) return Promise.resolve();
+      if (peer.wantsScreenShare === false) return Promise.resolve(); // stays paused; picks up new track on refocus
+      return sender.replaceTrack(newVideoTrack).catch(() => {});
     }));
 
     if (oldAudioTrack) {
       await Promise.all(Object.values(peers).map(peer => {
-        const sender = peer.pc.getSenders().find(s => s.track === oldAudioTrack);
-        return sender ? sender.replaceTrack(newAudioTrack || null).catch(() => {}) : Promise.resolve();
+        const sender = peer.screenSenders && peer.screenSenders.audio;
+        if (!sender) return Promise.resolve();
+        if (peer.wantsScreenShare === false) return Promise.resolve();
+        return sender.replaceTrack(newAudioTrack || null).catch(() => {});
       }));
     }
     // New source has audio but the original share didn't capture any —
@@ -1397,7 +1431,11 @@
     if (!screenStream) return;
     isScreenSharing = true;
     Object.values(peers).forEach(peer => {
-      screenStream.getTracks().forEach(track => peer.pc.addTrack(track, screenStream));
+      peer.screenSenders = {};
+      peer.wantsScreenShare = true; // default on; trimmed per-peer once they declare real focus (see setPeerScreenSenderActive)
+      screenStream.getTracks().forEach(track => {
+        peer.screenSenders[track.kind] = peer.pc.addTrack(track, screenStream);
+      });
       applyBandwidthLimit(peer.pc, peer);
     });
     screenShares[mySocketId] = screenShares[mySocketId] ||
@@ -1413,11 +1451,16 @@
   function stopScreenShare(silent) {
     if (!isScreenSharing && !screenStream) return;
     Object.values(peers).forEach(peer => {
-      peer.pc.getSenders().forEach(sender => {
-        if (sender.track && screenStream && screenStream.getTracks().includes(sender.track)) {
+      if (peer.screenSenders) {
+        // Tracked refs, not a current-track match — a paused (not-watching)
+        // peer's sender.track is already null, so it wouldn't be found by
+        // matching against screenStream's live tracks.
+        Object.values(peer.screenSenders).forEach(sender => {
           try { peer.pc.removeTrack(sender); } catch (e) {}
-        }
-      });
+        });
+        peer.screenSenders = null;
+      }
+      peer.wantsScreenShare = true; // reset for the next share
     });
     cleanupScreenStream();
     if (!silent && socket && roomId) socket.emit('screen-share-stop', { roomId });
@@ -2856,6 +2899,12 @@
       if (focusedShareId === data.sharerSocketId) updateWatcherBadge();
     });
 
+    // Sent only to us, only while we're sharing — a specific peer looked at
+    // (or away from) our share, so trim/restore their video sender.
+    socket.on('viewer-focus-changed', (data) => {
+      if (isScreenSharing) setPeerScreenSenderActive(data.viewerSocketId, data.watching);
+    });
+
     socket.on('screen-share-paused', (data) => {
       if (screenShares[data.socketId]) {
         screenShares[data.socketId].paused = true;
@@ -3410,67 +3459,30 @@
     }
   }
 
+  // A leave-then-create-new-room cycle could occasionally leave the next
+  // connect stuck in a "Connecting…" loop — stale socket/peer/audio state
+  // bleeding into the fresh room instead of a truly clean slate. A full
+  // reload after leaving sidesteps that entirely (same escape hatch the
+  // stuck-connecting overlay already falls back to, see beginConnecting),
+  // so leaving a room always hands the next room a guaranteed-fresh page.
+  // The visible cleanup below only covers what must happen BEFORE the
+  // reload wipes the JS context: releasing the mic/camera indicator and
+  // telling the server + peers we're gone, right away rather than whenever
+  // the reload's own teardown gets to it.
   function leaveRoom() {
-    if (isScreenSharing || screenStream) {
-      stopScreenShare();
-    }
-    if (isSharingDeviceAudio || deviceAudioStream) {
-      stopDeviceAudioShare();
-    }
-    if (roomId) {
-      socket.emit('leave-room', { roomId });
-    }
-    if (roomTimer) clearInterval(roomTimer);
-    if (pollInterval) clearInterval(pollInterval);
-    if (afkTimeout) clearTimeout(afkTimeout);
-    if (typingTimeout) clearTimeout(typingTimeout);
-    if (speakingTimeout) clearTimeout(speakingTimeout);
-    if (qualityStatsInterval) clearInterval(qualityStatsInterval);
-    if (recordingTimer) { clearInterval(recordingTimer); recordingTimer = null; }
-    if (mediaRecorder && isRecording) mediaRecorder.stop();
-
-    Object.values(peers).forEach(p => p.pc.close());
-    peers = {};
-    peerStreams = {};
-    remoteAnalysers = {};
-    screenShares = {};
-    remoteScreenStreams = {};
-    deviceAudioShares = {};
-    $('#device-audio-container')?.remove();
-    focusedShareId = null;
-    renderScreenShares();
-    setMicBanner(false);
-    teardownMicPipeline();
+    if (isScreenSharing || screenStream) stopScreenShare(true);
+    if (isSharingDeviceAudio || deviceAudioStream) stopDeviceAudioShare();
+    if (roomId && socket) socket.emit('leave-room', { roomId });
+    if (mediaRecorder && isRecording) { try { mediaRecorder.stop(); } catch (e) {} }
+    Object.values(peers).forEach(p => { try { p.pc.close(); } catch (e) {} });
     if (localStream) localStream.getTracks().forEach(t => t.stop());
-    localStream = null;
-    micAcquirePromise = null;
-    if (audioContext) audioContext.close();
-    audioContext = null;
-    audioWorkletModulePromise = null; // new AudioContext next join needs the module re-registered
-    roomId = null;
-    roomPassword = null;
-    isMuted = false;
-    isForceMuted = false;
-    isDeafened = false;
-    wasMutedBeforeDeafen = false;
-    isRecording = false;
-    chatOpen = false;
-    unreadCount = 0;
-    handRaised = false;
+    if (window.electronAPI) window.electronAPI.updateRoomState(false);
 
-    // Reset button states
-    const muteBtn = $('#btn-mute');
-    if (muteBtn) { muteBtn.classList.remove('muted-state'); muteBtn.querySelector('.control-label').textContent = 'Mic'; }
-    const deafenBtn = $('#btn-deafen');
-    if (deafenBtn) { deafenBtn.classList.remove('muted-state'); deafenBtn.querySelector('.control-label').textContent = 'Deafen'; }
-    const chatPanel = $('#chat-panel');
-    if (chatPanel) chatPanel.classList.remove('open');
-
-    if (window.electronAPI) {
-      window.electronAPI.updateRoomState(false);
-    }
-
-    switchScreen('lobby');
+    const overlay = $('#leave-overlay');
+    overlay.classList.add('show');
+    requestAnimationFrame(() => overlay.classList.add('visible'));
+    // Let the wave animation read before the reload cuts it off.
+    setTimeout(() => window.location.reload(), 650);
   }
 
   // ── FULL EMOJI PICKER ──

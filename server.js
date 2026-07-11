@@ -342,15 +342,28 @@ io.on('connection', (socket) => {
     if (!room || !room.screenShares) return;
     const touchedSharers = new Set();
     Object.values(room.screenShares).forEach(share => {
-      if (share.watchers.has(socket.id) && share.socketId !== sharerSocketId) {
-        share.watchers.delete(socket.id);
-        touchedSharers.add(share.socketId);
-      }
+      if (share.socketId === sharerSocketId || share.socketId === socket.id) return;
+      // Notify every other sharer unconditionally (not just ones this
+      // viewer was previously registered as watching) — a viewer can jump
+      // straight from one share to another without ever being recorded as
+      // watching the new one's neighbors, and each sharer's client defaults
+      // its per-peer sender to "on" until told otherwise (see
+      // setPeerScreenSenderActive), so a missed "false" here would leave
+      // that sharer sending video to a peer who's never actually watching.
+      const wasWatching = share.watchers.has(socket.id);
+      share.watchers.delete(socket.id);
+      if (wasWatching) touchedSharers.add(share.socketId);
+      // Mesh has no SFU to selectively forward media, so tell that sharer
+      // directly this viewer isn't watching them — they can stop sending
+      // their screen-share video to this one peer's connection and save
+      // the upload bandwidth.
+      io.to(share.socketId).emit('viewer-focus-changed', { viewerSocketId: socket.id, watching: false });
     });
     const target = room.screenShares[sharerSocketId];
     if (target && target.socketId !== socket.id) {
       target.watchers.add(socket.id);
       touchedSharers.add(sharerSocketId);
+      io.to(target.socketId).emit('viewer-focus-changed', { viewerSocketId: socket.id, watching: true });
     }
     touchedSharers.forEach(sid => {
       const share = room.screenShares[sid];
