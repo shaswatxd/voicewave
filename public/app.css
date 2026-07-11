@@ -60,6 +60,20 @@ body.light-theme {
   --wallpaper-bg: radial-gradient(circle at top right, #ffffff 0%, #f2f3f5 60%, #e3e5e8 100%);
 }
 
+/* Dark mode wallpaper presets */
+body.wp-cosmic {
+  --wallpaper-bg: radial-gradient(circle at 15% 15%, rgba(34, 211, 238, 0.08) 0%, transparent 40%), radial-gradient(circle at 85% 85%, rgba(168, 85, 247, 0.08) 0%, transparent 50%), radial-gradient(circle at top right, #0f111a 0%, #07090e 100%);
+}
+body.wp-obsidian {
+  --wallpaper-bg: radial-gradient(circle at top right, #2b2d31 0%, #1e1f22 60%, #111214 100%);
+}
+body.wp-forest {
+  --wallpaper-bg: radial-gradient(circle at 15% 20%, rgba(16, 185, 129, 0.06) 0%, transparent 45%), radial-gradient(circle at 80% 80%, rgba(5, 150, 105, 0.04) 0%, transparent 50%), radial-gradient(circle at top right, #062f25 0%, #022c22 60%, #011c14 100%);
+}
+body.wp-glass {
+  --wallpaper-bg: radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 50%), radial-gradient(circle at top right, #1e293b 0%, #0f172a 60%, #020617 100%);
+}
+
 /* Light mode wallpaper presets */
 body.light-theme.wp-cosmic {
   --wallpaper-bg: radial-gradient(circle at 80% 20%, #eff6ff 0%, #dbeafe 60%, #bfdbfe 100%);
@@ -1173,7 +1187,7 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
   #lobby.active { justify-content: flex-start; align-items: stretch; }
 
   /* ROOM LAYOUT - Discord style */
-  #room.active { background: var(--bg); padding-bottom: env(safe-area-inset-bottom, 8px); }
+  #room.active { background: transparent; padding-bottom: env(safe-area-inset-bottom, 8px); }
 
   .titlebar { display: flex; align-items: center; justify-content: space-between; height: 36px; background: var(--bg); border-bottom: 1px solid var(--border); flex-shrink: 0; user-select: none; z-index: 500; }
   .titlebar-drag { flex: 1; display: flex; align-items: center; padding-left: 14px; -webkit-app-region: drag; }
@@ -2200,17 +2214,6 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
 
 /* ── LIVE STREAM QUALITY DROPDOWN (sharer-only, reuses participants-dropdown base) ── */
 .stage-quality-dropdown { width: 200px; right: auto; left: 0; }
-
-/* ── MOBILE ROOM HEADER DECLUTTER ──
-   Lock/permissions/create-poll are rarely-used host tools that used to wrap
-   the header into a cramped second row on phones. Poll creation moves into
-   the chat panel (➕ next to Active Polls); lock/permissions stay reachable
-   from desktop/tablet widths where there's room for them. */
-.is-mobile #btn-room-lock,
-.is-mobile #btn-permissions-modal,
-.is-mobile #btn-polls-trigger {
-  display: none !important;
-}
 
 /* ── KEYBOARD SHORTCUTS MODAL ── */
 .shortcuts-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }

@@ -13,7 +13,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.96">
+<link rel="stylesheet" href="/app.css?v=1.0.97">
 <!-- Consolidated Styles moved to app.css -->
 </head>
 <body>
@@ -142,39 +142,6 @@
         </div>
         <div class="profile-info">
           <div class="profile-name" id="profile-name">Set your name to start</div>
-          <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
-            <div class="custom-select" id="status-select-wrap">
-              <button type="button" class="custom-select-trigger" id="profile-status-trigger">
-                <span class="custom-select-label" id="profile-status-trigger-label">🟢 Online</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-              </button>
-              <div class="custom-select-menu" id="profile-status-menu">
-                <button type="button" class="custom-select-option" data-value="online">🟢 Online</button>
-                <button type="button" class="custom-select-option" data-value="idle">🌙 Idle</button>
-                <button type="button" class="custom-select-option" data-value="dnd">🔴 Do Not Disturb</button>
-              </div>
-            </div>
-            <div style="margin-top: 4px; text-align: left;">
-              <input type="text" id="profile-status-text" placeholder="Status: What's on your mind?" maxlength="40" style="padding: 8px 12px; font-size: 0.78rem; margin: 0; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; color: var(--text); width: 100%;">
-            </div>
-            <div class="custom-select" id="avatar-color-select-wrap" style="margin-top: 4px;">
-              <button type="button" class="custom-select-trigger" id="profile-avatar-color-trigger">
-                <span class="color-swatch avatar-accent-cyan" id="profile-avatar-color-swatch"></span>
-                <span class="custom-select-label" id="profile-avatar-color-trigger-label">Cyan Glow</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-              </button>
-              <div class="custom-select-menu" id="profile-avatar-color-menu">
-                <button type="button" class="custom-select-option" data-value="cyan"><span class="color-swatch avatar-accent-cyan"></span>Cyan Glow</button>
-                <button type="button" class="custom-select-option" data-value="purple"><span class="color-swatch avatar-accent-purple"></span>Purple Haze</button>
-                <button type="button" class="custom-select-option" data-value="pink"><span class="color-swatch avatar-accent-pink"></span>Pink Punch</button>
-                <button type="button" class="custom-select-option" data-value="green"><span class="color-swatch avatar-accent-green"></span>Emerald</button>
-                <button type="button" class="custom-select-option" data-value="orange"><span class="color-swatch avatar-accent-orange"></span>Sunset Amber</button>
-                <button type="button" class="custom-select-option" data-value="red"><span class="color-swatch avatar-accent-red"></span>Ruby Flare</button>
-                <button type="button" class="custom-select-option" data-value="blue"><span class="color-swatch avatar-accent-blue"></span>Royal Blue</button>
-              </div>
-            </div>
-            <button id="lobby-theme-toggle" class="btn btn-ghost btn-sm" style="font-size:0.75rem;">🌗 Toggle Light/Dark Mode</button>
-          </div>
         </div>
         <button class="btn btn-ghost btn-sm profile-remove-btn" id="btn-remove-avatar" style="display:none; margin-top:10px;">Remove Photo</button>
       </div>
@@ -191,14 +158,7 @@
     </div>
     <div class="room-timer" id="room-timer">00:00</div>
     <div class="room-actions">
-      <button class="btn-icon" id="btn-room-lock" title="Lock/Unlock Room" style="display:none;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      </button>
-      <button class="btn-icon" id="btn-permissions-modal" title="Room Permissions" style="display:none;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
-      </button>
       <button class="btn-icon" id="btn-soundboard-trigger" title="Soundboard">🔊</button>
-      <button class="btn-icon" id="btn-polls-trigger" title="Create Poll">📊</button>
       <button class="btn-icon" id="btn-hand-raise" title="Raise Hand">✋</button>
       <button class="btn-icon" id="btn-invite" title="Copy Invite Link">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
@@ -748,7 +708,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.96';
+  window.APP_VERSION = '1.0.97';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -786,6 +746,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.96"></script>
+<script src="/app.js?v=1.0.97"></script>
 </body>
 </html>
