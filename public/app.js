@@ -225,19 +225,7 @@
   }
 
   function createBannerParticles() {
-    const container = $('#banner-particles');
-    if (!container) return;
-    container.innerHTML = '';
-    for (let i = 0; i < 12; i++) {
-      const p = document.createElement('div');
-      p.className = 'banner-particle';
-      p.style.left = Math.random() * 100 + '%';
-      p.style.animationDuration = (2 + Math.random() * 3) + 's';
-      p.style.animationDelay = Math.random() * 4 + 's';
-      p.style.width = (2 + Math.random() * 3) + 'px';
-      p.style.height = p.style.width;
-      container.appendChild(p);
-    }
+    // Removed - banner is now clean and static
   }
 
   function updateProfileDisplayName() {
