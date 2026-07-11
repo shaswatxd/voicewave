@@ -371,7 +371,7 @@
   <div class="container">
     <div class="hero-eyebrow">Real-Time Voice Chat</div>
     <h1>VoiceWave</h1>
-    <p class="hero-desc">Crystal-clear real-time voice chat powered by WebRTC peer-to-peer connections. No accounts. No downloads required. Just click and talk.</p>
+    <p class="hero-desc">Crystal-clear real-time voice chat with screen sharing, rich text chat, and full moderation — powered by WebRTC peer-to-peer connections. No accounts. No downloads required. Just click and talk.</p>
     <div class="hero-links">
       <a href="/app" class="btn btn-primary">🚀 Launch VoiceWave</a>
       <a href="https://github.com/shaswatxd/voicewave/releases/latest/download/VoiceWave-1.0.119-Setup.exe" class="btn btn-download">⬇ Download for Windows</a>
@@ -430,32 +430,62 @@
       <div class="card">
         <div class="feature-icon">🎙️</div>
         <div class="feature-title">Peer-to-Peer Voice</div>
-        <div class="feature-desc">Direct WebRTC connections for ultra-low latency. No server relay — your voice travels directly to other participants.</div>
+        <div class="feature-desc">Direct WebRTC connections for ultra-low latency. No server relay — your voice travels directly to other participants with noise gate &amp; echo cancellation.</div>
+      </div>
+      <div class="card">
+        <div class="feature-icon">🖥️</div>
+        <div class="feature-title">Screen Share</div>
+        <div class="feature-desc">Discord-style multi-stream screen sharing. Multiple people can go live at once with resolution up to 1440p, 60 FPS, and system audio capture.</div>
+      </div>
+      <div class="card">
+        <div class="feature-icon">💬</div>
+        <div class="feature-title">Rich Text Chat</div>
+        <div class="feature-desc">Full-featured messaging with markdown, @mentions, reactions, replies, message editing, file sharing, and typing indicators.</div>
       </div>
       <div class="card">
         <div class="feature-icon">🔒</div>
         <div class="feature-title">Password Protected</div>
-        <div class="feature-desc">Create private rooms with passwords. Only people with the password can join your conversation.</div>
+        <div class="feature-desc">Create private rooms with passwords, invite links with expiry, room locking, and bans for complete access control.</div>
       </div>
       <div class="card">
-        <div class="feature-icon">💬</div>
-        <div class="feature-title">Text Chat</div>
-        <div class="feature-desc">Built-in messaging with emoji support, file sharing, and typing indicators alongside voice.</div>
+        <div class="feature-icon">🛡️</div>
+        <div class="feature-title">Admin &amp; Moderation</div>
+        <div class="feature-desc">Kick, mute, force-mute, transfer host, assign moderators, room permissions, and ban users — full Discord-style moderation.</div>
       </div>
       <div class="card">
         <div class="feature-icon">🎵</div>
         <div class="feature-title">Soundboard</div>
-        <div class="feature-desc">10 built-in sounds to add fun to your conversations. Airhorn, clap, laugh, and more.</div>
+        <div class="feature-desc">10 built-in synth sounds to add fun to your conversations. Airhorn, clap, laugh, ding, and more — no audio files needed.</div>
       </div>
       <div class="card">
         <div class="feature-icon">🎛️</div>
         <div class="feature-title">Audio Controls</div>
-        <div class="feature-desc">Per-user volume, master volume, mic gain, noise gate, and professional audio processing.</div>
+        <div class="feature-desc">Per-user volume, master volume, mic gain, noise gate, push-to-talk, echo cancellation, and low bandwidth mode.</div>
+      </div>
+      <div class="card">
+        <div class="feature-icon">📊</div>
+        <div class="feature-title">Polls &amp; Pinning</div>
+        <div class="feature-desc">Create room polls for group decisions, pin important messages, and use the full emoji picker for reactions.</div>
+      </div>
+      <div class="card">
+        <div class="feature-icon">👤</div>
+        <div class="feature-title">Custom Profiles</div>
+        <div class="feature-desc">Upload avatars, choose accent colors, set display names and status. Your identity carries across sessions.</div>
+      </div>
+      <div class="card">
+        <div class="feature-icon">🎨</div>
+        <div class="feature-title">Themes &amp; Wallpapers</div>
+        <div class="feature-desc">Dark and light modes with 4 wallpaper presets — Cosmic, Obsidian, Forest, and Glass. Easy on the eyes.</div>
+      </div>
+      <div class="card">
+        <div class="feature-icon">⌨️</div>
+        <div class="feature-title">Keyboard Shortcuts</div>
+        <div class="feature-desc">Speed things up with M to mute, D to deafen, C for chat, Space for push-to-talk, and @ for mentions.</div>
       </div>
       <div class="card">
         <div class="feature-icon">📱</div>
         <div class="feature-title">Works Everywhere</div>
-        <div class="feature-desc">PWA support, Electron desktop app, or just use your browser. No downloads required.</div>
+        <div class="feature-desc">PWA install, Electron desktop app with system tray, or just use your browser. No downloads required.</div>
       </div>
     </div>
   </div>
@@ -471,6 +501,10 @@
         <div class="stack-val">Express + Socket.IO</div>
       </div>
       <div class="stack-item">
+        <div class="stack-key">Voice/Video</div>
+        <div class="stack-val">WebRTC P2P Mesh</div>
+      </div>
+      <div class="stack-item">
         <div class="stack-key">Frontend</div>
         <div class="stack-val">Vanilla JS / CSS</div>
       </div>
@@ -479,8 +513,20 @@
         <div class="stack-val">Electron 28</div>
       </div>
       <div class="stack-item">
+        <div class="stack-key">Audio</div>
+        <div class="stack-val">Web Audio API + Worklet</div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-key">Offline</div>
+        <div class="stack-val">PWA + Service Worker</div>
+      </div>
+      <div class="stack-item">
         <div class="stack-key">Deploy</div>
         <div class="stack-val">Render</div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-key">Storage</div>
+        <div class="stack-val">Persistent JSON Rooms</div>
       </div>
     </div>
   </div>
@@ -539,7 +585,7 @@
   <div class="container">
     <div class="section-label">Download</div>
     <h2>Get VoiceWave Desktop</h2>
-    <p style="color:var(--muted);font-size:0.95rem;max-width:480px;margin:0 auto 32px;">System tray integration, global hotkeys, and always-on-top. Runs on Windows 10+.</p>
+    <p style="color:var(--muted);font-size:0.95rem;max-width:480px;margin:0 auto 32px;">System tray integration, global hotkeys, screen sharing, auto-updates, and always-on-top. Runs on Windows 10+.</p>
     <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
       <a href="https://github.com/shaswatxd/voicewave/releases/latest/download/VoiceWave-1.0.119-Setup.exe" class="btn btn-download" style="font-size:1rem;padding:14px 32px;">⬇ Download VoiceWave v1.0.119</a>
     </div>
