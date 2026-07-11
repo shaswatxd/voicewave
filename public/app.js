@@ -61,6 +61,8 @@
     'linear-gradient(135deg,#8b5cf6,#7c3aed)'
   ];
 
+  const STATUS_LABELS = { online: '🟢 Online', away: '🌙 Away', dnd: '🔴 Do Not Disturb', invisible: '⚪ Invisible' };
+
   const SOUNDS = {
     airhorn: '📯', clap: '👏', laugh: '😂', ding: '🔔',
     bruh: '💀', sad: '😢', win: '🏆', drum: '🥁',
@@ -3643,7 +3645,11 @@
     const avatarColorSwatch = $('#profile-avatar-color-swatch');
     if (avatarColorSwatch) avatarColorSwatch.className = `color-swatch ${getAvatarClass(myAvatarColor)}`;
     $(`#profile-avatar-color-menu [data-value="${myAvatarColor}"]`)?.classList.add('selected');
+
+    const statusLabel = $('#profile-status-trigger-label');
+    if (statusLabel) statusLabel.textContent = STATUS_LABELS[myStatus] || STATUS_LABELS.online;
     $(`#profile-status-menu [data-value="${myStatus}"]`)?.classList.add('selected');
+    updateProfileStatusDot();
     updateProfileAvatarColorOrText();
   }
 
@@ -3667,17 +3673,19 @@
     $('#tb-theme-toggle')?.addEventListener('click', () => applyTheme(localTheme === 'dark' ? 'light' : 'dark'));
 
     // Status custom dropdown
-    const STATUS_LABELS = { online: '🟢 Online', idle: '🌙 Idle', dnd: '🔴 Do Not Disturb' };
     initCustomSelect('status-select-wrap', 'profile-status-menu', (value) => {
       myStatus = value;
+      localStorage.setItem('vw_status', myStatus);
       $('#profile-status-trigger-label').textContent = STATUS_LABELS[value] || STATUS_LABELS.online;
+      updateProfileStatusDot();
       if (roomId && socket && socket.connected) {
         socket.emit('update-status', { roomId, status: myStatus });
       }
       // Update local card
       const dot = $(`[data-socket="${mySocketId}"] .status-dot`);
-      const statusColors = { online: '#22c55e', idle: '#eab308', dnd: '#ef4444' };
+      const statusColors = { online: '#22c55e', away: '#eab308', dnd: '#ef4444', invisible: '#94a3b8' };
       if (dot) dot.style.background = statusColors[myStatus] || '#22c55e';
+      toast(`Status set to ${STATUS_LABELS[value] || value}`, 'info');
     });
 
     // PTT Enabled trigger

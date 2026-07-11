@@ -899,8 +899,15 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
   padding: 12px 14px 14px;
   width: 100%;
   box-sizing: border-box;
-  animation: formFade 0.4s ease 0.2s both;
 }
+.profile-form .form-group {
+  animation: formFade 0.35s ease both;
+}
+.profile-form .form-group:nth-child(1) { animation-delay: 0.15s; }
+.profile-form .form-group:nth-child(2) { animation-delay: 0.2s; }
+.profile-form .form-group:nth-child(3) { animation-delay: 0.25s; }
+.profile-form .form-group:nth-child(4) { animation-delay: 0.3s; }
+.profile-form .profile-remove-btn { animation: formFade 0.35s ease 0.35s both; }
 @keyframes formFade {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
