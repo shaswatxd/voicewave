@@ -13,7 +13,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.86">
+<link rel="stylesheet" href="/app.css?v=1.0.87">
 <!-- Consolidated Styles moved to app.css -->
 </head>
 <body>
@@ -105,22 +105,24 @@
         📲 Install App
       </button>
 
-      <div id="update-section" style="display:none;margin-top:auto;margin-bottom:16px;padding:16px 20px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;width:100%;box-sizing:border-box;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-            <span id="update-label" style="font-size:0.88rem;color:#d1d5db;">Checking for updates...</span>
+      <div id="update-section" class="update-card">
+        <div class="update-card-row">
+          <div class="update-card-info">
+            <span class="update-icon" id="update-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            </span>
+            <span id="update-label" class="update-label">Checking for updates...</span>
           </div>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-primary" id="btn-check-update" style="display:none;font-size:0.8rem;padding:8px 18px;">Check for Updates</button>
-            <button class="btn btn-primary" id="btn-download-update" style="display:none;font-size:0.8rem;padding:8px 18px;">Download</button>
-            <button class="btn btn-primary" id="btn-install-update" style="display:none;font-size:0.8rem;padding:8px 18px;background:#22c55e;">Close & Install</button>
+          <div class="update-card-actions">
+            <button class="btn btn-primary btn-sm" id="btn-check-update" style="display:none;">Check for Updates</button>
+            <button class="btn btn-primary btn-sm" id="btn-download-update" style="display:none;">Download</button>
+            <button class="btn btn-primary btn-sm update-btn-install" id="btn-install-update" style="display:none;">Close &amp; Install</button>
           </div>
         </div>
-        <div id="update-progress-bar" style="display:none;margin-top:10px;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">
-          <div id="update-progress-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#22d3ee,#a855f7);border-radius:3px;transition:width 0.3s;"></div>
+        <div id="update-progress-bar" class="update-progress" style="display:none;">
+          <div id="update-progress-fill" class="update-progress-fill"></div>
         </div>
-        <div id="update-progress-text" style="display:none;font-size:0.75rem;color:#6b7280;margin-top:6px;"></div>
+        <div id="update-progress-text" class="update-progress-text" style="display:none;"></div>
       </div>
     </div>
 
@@ -732,7 +734,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.86';
+  window.APP_VERSION = '1.0.87';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -778,6 +780,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.86"></script>
+<script src="/app.js?v=1.0.87"></script>
 </body>
 </html>

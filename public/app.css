@@ -218,6 +218,76 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
   font-size: 0.78rem; color: var(--muted);
 }
 
+/* ── AUTO-UPDATE CARD ── */
+.update-card {
+  display: none;
+  margin-top: auto; margin-bottom: 16px;
+  padding: 16px 20px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  width: 100%; box-sizing: border-box;
+  opacity: 0; transform: translateY(6px);
+  transition: opacity 0.35s ease, transform 0.35s ease, border-color 0.3s ease;
+}
+.update-card.show { display: block; }
+.update-card.visible { opacity: 1; transform: translateY(0); }
+.update-card-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.update-card-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.update-icon {
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; color: var(--cyan);
+  transition: color 0.3s ease;
+}
+.update-icon.spin svg { animation: updateSpin 1s linear infinite; }
+.update-icon.pulse svg { animation: updatePulse 1.4s ease-in-out infinite; }
+.update-icon.ok { color: #22c55e; }
+.update-icon.err { color: #ef4444; }
+@keyframes updateSpin { to { transform: rotate(360deg); } }
+@keyframes updatePulse {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  50% { transform: translateY(2px); opacity: 0.65; }
+}
+.update-label {
+  font-size: 0.88rem; color: #d1d5db;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: color 0.3s ease;
+}
+.update-card-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.update-btn-install { background: #22c55e; }
+.update-progress {
+  margin-top: 10px; height: 6px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px; overflow: hidden;
+  position: relative;
+}
+.update-progress-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, #22d3ee, #a855f7);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+  position: relative;
+  overflow: hidden;
+}
+/* Moving shimmer highlight over the fill — reads as active progress rather
+   than a static bar that just happens to be growing. */
+.update-progress-fill::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  width: 60%;
+  animation: updateShimmer 1.3s linear infinite;
+}
+@keyframes updateShimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(220%); }
+}
+.update-progress-text {
+  font-size: 0.75rem; color: #6b7280; margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── ROOM ── */
 .room-header {
   display: flex; align-items: center; justify-content: space-between;

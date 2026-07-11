@@ -2269,7 +2269,13 @@
     if (socket) { socket.disconnect(); socket = null; }
 
     socket = io(window.location.origin, {
-      transports: ['websocket', 'polling']
+      // Polling first, then upgrade to websocket — some networks (corporate
+      // proxies, strict firewalls, certain mobile hotspots) strip the
+      // WebSocket upgrade handshake with no fallback if 'websocket' is tried
+      // first. This is the connectivity-safe default; the extra polling
+      // round-trip on connect is a few hundred ms, not the actual delay
+      // users perceive as a "connecting loop".
+      transports: ['polling', 'websocket']
     });
 
     socket.on('connect', () => {
@@ -4604,6 +4610,7 @@
 
   if (window.electronAPI && window.electronAPI.isElectron) {
     const updateSection = $('#update-section');
+    const updateIcon = $('#update-icon');
     const updateLabel = $('#update-label');
     const btnCheck = $('#btn-check-update');
     const btnDownload = $('#btn-download-update');
@@ -4612,7 +4619,22 @@
     const progressFill = $('#update-progress-fill');
     const progressText = $('#update-progress-text');
 
-    updateSection.style.display = 'block';
+    const ICONS = {
+      cloud: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>',
+      spinner: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
+      check: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+      alert: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>'
+    };
+
+    // Central state setter — one place to swap icon/animation/label color
+    // instead of repeating the same five lines per status branch.
+    function setUpdateIcon(name, animClass) {
+      updateIcon.innerHTML = ICONS[name];
+      updateIcon.className = `update-icon${animClass ? ' ' + animClass : ''}`;
+    }
+
+    updateSection.classList.add('show');
+    requestAnimationFrame(() => updateSection.classList.add('visible'));
 
     btnCheck.addEventListener('click', () => {
       btnCheck.style.display = 'none';
@@ -4624,8 +4646,8 @@
     window.electronAPI.onUpdateStatus((data) => {
       switch (data.status) {
         case 'checking':
+          setUpdateIcon('spinner', 'spin');
           updateLabel.textContent = 'Checking for updates...';
-          updateLabel.style.color = 'var(--text)';
           btnCheck.style.display = 'none';
           btnDownload.style.display = 'none';
           btnInstall.style.display = 'none';
@@ -4633,8 +4655,8 @@
           progressText.style.display = 'none';
           break;
         case 'available':
+          setUpdateIcon('cloud');
           updateLabel.textContent = `Update v${data.version} available`;
-          updateLabel.style.color = '#22d3ee';
           btnCheck.style.display = 'none';
           btnDownload.style.display = 'inline-flex';
           btnInstall.style.display = 'none';
@@ -4643,17 +4665,17 @@
           toast(`Update v${data.version} available!`, 'info');
           break;
         case 'downloading':
+          setUpdateIcon('cloud', 'pulse');
           updateLabel.textContent = 'Downloading update...';
-          updateLabel.style.color = 'var(--text)';
           btnDownload.style.display = 'none';
           progressBar.style.display = 'block';
           progressText.style.display = 'block';
           progressFill.style.width = data.percent + '%';
-          progressText.textContent = data.percent + '%';
+          progressText.textContent = `${data.percent}%`;
           break;
         case 'ready':
+          setUpdateIcon('check', 'ok');
           updateLabel.textContent = 'Update ready to install';
-          updateLabel.style.color = '#22c55e';
           btnInstall.style.display = 'inline-flex';
           btnDownload.style.display = 'none';
           progressBar.style.display = 'none';
@@ -4661,8 +4683,8 @@
           toast('Update downloaded — click Close & Install', 'success');
           break;
         case 'up-to-date':
+          setUpdateIcon('check', 'ok');
           updateLabel.textContent = `App is up to date (v${window.APP_VERSION || '1.0.2'})`;
-          updateLabel.style.color = 'var(--muted)';
           btnCheck.style.display = 'inline-flex';
           btnDownload.style.display = 'none';
           btnInstall.style.display = 'none';
@@ -4670,8 +4692,8 @@
           progressText.style.display = 'none';
           break;
         case 'error':
+          setUpdateIcon('alert', 'err');
           updateLabel.textContent = `Update check failed: ${data.message || 'Unknown error'}`;
-          updateLabel.style.color = '#ef4444';
           btnCheck.style.display = 'inline-flex';
           btnDownload.style.display = 'none';
           btnInstall.style.display = 'none';
