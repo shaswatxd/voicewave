@@ -779,21 +779,26 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
   flex-direction: column;
   align-items: center;
   width: 100%;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg,
+      rgba(6, 182, 212, 0.18) 0%,
+      rgba(168, 85, 247, 0.14) 35%,
+      var(--bg-card) 65%
+    );
+  border: 1px solid rgba(34, 211, 238, 0.12);
   border-radius: 16px;
   overflow: hidden;
   position: relative;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
   padding-bottom: 20px;
 }
 .profile-banner {
-  height: 72px;
+  height: 76px;
   width: 100%;
   background: linear-gradient(135deg,
-    rgba(6, 182, 212, 0.35) 0%,
-    rgba(168, 85, 247, 0.4) 50%,
-    rgba(236, 72, 153, 0.2) 100%);
+    rgba(6, 182, 212, 0.55) 0%,
+    rgba(168, 85, 247, 0.6) 55%,
+    rgba(236, 72, 153, 0.35) 100%);
   position: relative;
   flex-shrink: 0;
 }
@@ -801,7 +806,12 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, transparent 40%, rgba(var(--bg-card-rgb, 49, 51, 56), 0.3) 100%);
+  background: linear-gradient(to bottom,
+    transparent 0%,
+    transparent 50%,
+    rgba(49, 51, 56, 0.6) 85%,
+    rgba(49, 51, 56, 0.95) 100%
+  );
 }
 .profile-avatar-container {
   display: flex;
