@@ -13,7 +13,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.87">
+<link rel="stylesheet" href="/app.css?v=1.0.88">
 <!-- Consolidated Styles moved to app.css -->
 </head>
 <body>
@@ -252,9 +252,33 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
               <input type="range" id="stage-volume" min="0" max="100" value="100">
             </div>
-            <button class="btn-icon stage-btn" id="stage-laser" title="Laser pointer">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>
-            </button>
+            <div class="stage-quality-wrap" style="position:relative; display:none;" id="stage-quality-wrap">
+              <button class="btn-icon stage-btn" id="stage-quality" title="Stream quality">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="1" x2="7" y1="14" y2="14"/><line x1="9" x2="15" y1="8" y2="8"/><line x1="17" x2="23" y1="16" y2="16"/></svg>
+              </button>
+              <div class="participants-dropdown stage-quality-dropdown" id="stage-quality-dropdown">
+                <div class="pd-header">Stream Quality</div>
+                <div style="padding:10px 14px; display:flex; flex-direction:column; gap:10px;">
+                  <div>
+                    <label style="font-size:0.75rem; color:var(--muted); display:block; margin-bottom:4px;">Resolution</label>
+                    <select id="live-resolution" style="width:100%; margin:0;">
+                      <option value="720">720p</option>
+                      <option value="1080" selected>1080p</option>
+                      <option value="1440">1440p</option>
+                      <option value="source">Source</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size:0.75rem; color:var(--muted); display:block; margin-bottom:4px;">Frame Rate</label>
+                    <select id="live-fps" style="width:100%; margin:0;">
+                      <option value="15">15 FPS</option>
+                      <option value="30" selected>30 FPS</option>
+                      <option value="60">60 FPS (Smooth)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
             <button class="btn-icon stage-btn" id="stage-pip" title="Picture in Picture">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><rect width="8" height="5" x="12" y="12" rx="1" fill="currentColor"/></svg>
             </button>
@@ -275,7 +299,6 @@
         </div>
         <div class="stage-video-wrap" id="stage-video-wrap">
           <video id="stage-video" autoplay playsinline></video>
-          <div id="stage-pointer-layer"></div>
           <div class="stage-waiting" id="stage-waiting">
             <div class="connecting-spinner" style="width:36px;height:36px;"></div>
             <span id="stage-waiting-text">Connecting to stream…</span>
@@ -299,6 +322,7 @@
           <h3>💬 Chat</h3>
           <button class="btn-icon btn-sm" id="btn-pinned-messages-trigger" title="Pinned Messages" style="width:26px; height:26px; font-size:0.75rem; padding:0;">📌</button>
           <button class="btn-icon btn-sm" id="btn-active-polls-trigger" title="Active Polls" style="width:26px; height:26px; font-size:0.75rem; padding:0;">📊</button>
+          <button class="btn-icon btn-sm" id="btn-create-poll-chat" title="Create Poll" style="width:26px; height:26px; font-size:0.75rem; padding:0;">➕</button>
         </div>
         <div style="display:flex; align-items:center; gap:6px;">
           <input type="text" id="chat-search" placeholder="Search..." style="margin:0; padding:6px 10px; font-size:0.75rem; width:80px; border-radius:6px; transition: width 0.2s;">
@@ -734,7 +758,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.87';
+  window.APP_VERSION = '1.0.88';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -780,6 +804,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.87"></script>
+<script src="/app.js?v=1.0.88"></script>
 </body>
 </html>

@@ -342,36 +342,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Laser pointer — scoped to whoever's actually watching this specific
-  // share (reuses the same watchers Set as the viewer-count feature), plus
-  // the sharer themselves even though they're deliberately excluded from
-  // their own watchers set above.
-  function pointerRecipients(room, sharerSocketId, excludeSocketId) {
-    const share = room.screenShares?.[sharerSocketId];
-    const ids = new Set(share ? share.watchers : []);
-    if (sharerSocketId) ids.add(sharerSocketId);
-    ids.delete(excludeSocketId);
-    return ids;
-  }
-
-  socket.on('pointer-move', ({ roomId, sharerSocketId, x, y }) => {
-    const room = rooms.get(roomId);
-    if (!room || !room.users.has(socket.id) || !room.screenShares?.[sharerSocketId]) return;
-    const payload = {
-      socketId: socket.id,
-      name: socket.userName,
-      x: Math.min(1, Math.max(0, Number(x) || 0)),
-      y: Math.min(1, Math.max(0, Number(y) || 0))
-    };
-    pointerRecipients(room, sharerSocketId, socket.id).forEach(id => io.to(id).emit('pointer-move', payload));
-  });
-
-  socket.on('pointer-hide', ({ roomId, sharerSocketId }) => {
-    const room = rooms.get(roomId);
-    if (!room || !room.users.has(socket.id)) return;
-    pointerRecipients(room, sharerSocketId, socket.id).forEach(id => io.to(id).emit('pointer-hide', { socketId: socket.id }));
-  });
-
   socket.on('user-muted', ({ roomId, muted }) => {
     const room = rooms.get(roomId);
     if (room && room.users.has(socket.id)) {

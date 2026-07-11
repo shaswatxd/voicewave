@@ -343,16 +343,6 @@
     return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
   }
 
-  // Solid-color variant of AVATAR_COLORS (same hash, same index, matching
-  // starting hex) — gradients can't serve as CSS currentColor for the laser
-  // pointer's box-shadow/label background.
-  const POINTER_COLORS = ['#22d3ee', '#a855f7', '#ec4899', '#22c55e', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6'];
-  function getPointerColor(name) {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    return POINTER_COLORS[Math.abs(hash) % POINTER_COLORS.length];
-  }
-
   function getInitial(name) {
     return name ? name.charAt(0).toUpperCase() : '?';
   }
@@ -1102,6 +1092,37 @@
     // 'source' = no constraint, capture native size
   };
 
+  // Change resolution/FPS on an already-live share without restarting it —
+  // applyConstraints() on the existing video track re-negotiates capture
+  // parameters in place (no new getDisplayMedia prompt, no replaceTrack,
+  // no viewer-visible glitch), unlike switching source which needs a whole
+  // new stream.
+  async function applyLiveQuality({ resolution, fps }) {
+    if (!screenStream) return;
+    const videoTrack = screenStream.getVideoTracks()[0];
+    if (!videoTrack) return;
+
+    if (resolution !== undefined) shareResolution = resolution;
+    if (fps !== undefined) shareFps = fps;
+    localStorage.setItem('vw_share_res', shareResolution);
+    localStorage.setItem('vw_share_fps', String(shareFps));
+
+    const constraints = { frameRate: { ideal: shareFps, max: shareFps } };
+    const res = SHARE_RESOLUTIONS[shareResolution];
+    if (res) {
+      constraints.width = { max: res.width };
+      constraints.height = { max: res.height };
+    }
+    try {
+      await videoTrack.applyConstraints(constraints);
+      try { videoTrack.contentHint = shareFps >= 60 ? 'motion' : 'detail'; } catch (e) {}
+      toast('Stream quality updated', 'success');
+    } catch (err) {
+      console.error('[VoiceWave] applyLiveQuality error:', err);
+      toast('This capture source doesn\'t support that quality change', 'error');
+    }
+  }
+
   async function startScreenShare() {
     if (!selectedScreenSource) return;
     const withAudio = !!$('#picker-share-audio')?.checked;
@@ -1354,7 +1375,6 @@
       if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => {});
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       focusedShareId = null;
-      clearAllPointers();
       clearConnectingWaitTimer();
       return;
     }
@@ -1387,6 +1407,8 @@
       $('#stage-stop').style.display = isScreenSharing ? 'inline-flex' : 'none';
       $('#stage-pause').style.display = 'none';
       $('#stage-switch-source').style.display = 'none';
+      const qualityWrapHidden = $('#stage-quality-wrap');
+      if (qualityWrapHidden) qualityWrapHidden.style.display = 'none';
       const volWrap = $('#stage-volume-wrap');
       if (volWrap) volWrap.style.display = 'none';
       clearConnectingWaitTimer();
@@ -1461,6 +1483,8 @@
     $('#stage-pause').classList.toggle('active', !!share.paused);
     $('#stage-pause').title = share.paused ? 'Resume sharing' : 'Pause sharing';
     $('#stage-switch-source').style.display = isLocal && isScreenSharing ? 'inline-flex' : 'none';
+    const qualityWrap = $('#stage-quality-wrap');
+    if (qualityWrap) qualityWrap.style.display = isLocal && isScreenSharing ? 'inline-flex' : 'none';
     const volWrap = $('#stage-volume-wrap');
     if (volWrap) volWrap.style.display = isLocal ? 'none' : 'flex';
 
@@ -1503,8 +1527,6 @@
           <span class="stage-thumb-name"></span>
         `;
         tile.addEventListener('click', () => {
-          if (laserPointerActive) emitPointerHide();
-          clearAllPointers();
           focusedShareId = tile.dataset.share;
           renderScreenShares();
         });
@@ -1525,113 +1547,6 @@
     strip.querySelectorAll('.stage-thumb').forEach(tile => {
       if (!seen.has(tile.dataset.share)) tile.remove();
     });
-  }
-
-  // ── LASER POINTER ──
-  let laserPointerActive = false;
-  let lastPointerEmitAt = 0;
-  let pointerFadeTimers = {};
-  let pointerResizeObserver = null;
-
-  // #stage-video uses object-fit:contain, so its rendered box is smaller
-  // than the wrap on one axis whenever aspect ratios differ. Compute the
-  // actual video rect in wrap-local coordinates so normalized (0-1) pointer
-  // positions re-project correctly regardless of the viewer's own window size.
-  function getContainedVideoBox(video, wrapRect) {
-    const vw = video.videoWidth, vh = video.videoHeight;
-    if (!vw || !vh) return { left: 0, top: 0, width: wrapRect.width, height: wrapRect.height };
-    const elAspect = wrapRect.width / wrapRect.height, vidAspect = vw / vh;
-    if (vidAspect > elAspect) {
-      const w = wrapRect.width, h = w / vidAspect;
-      return { left: 0, top: (wrapRect.height - h) / 2, width: w, height: h };
-    }
-    const h = wrapRect.height, w = h * vidAspect;
-    return { left: (wrapRect.width - w) / 2, top: 0, width: w, height: h };
-  }
-
-  function toggleLaserPointer() {
-    laserPointerActive = !laserPointerActive;
-    $('#stage-video-wrap')?.classList.toggle('laser-active', laserPointerActive);
-    $('#stage-laser')?.classList.toggle('laser-on', laserPointerActive);
-    if (!laserPointerActive) emitPointerHide();
-  }
-
-  function handleStageMouseMove(e) {
-    if (!laserPointerActive || !focusedShareId || !socket || !roomId) return;
-    const now = Date.now();
-    if (now - lastPointerEmitAt < 50) return; // ~20Hz — smooth, trivial payload size
-    lastPointerEmitAt = now;
-    const video = $('#stage-video');
-    const wrap = $('#stage-video-wrap');
-    if (!video || !wrap) return;
-    const wrapRect = wrap.getBoundingClientRect();
-    const box = getContainedVideoBox(video, wrapRect);
-    if (!box.width || !box.height) return;
-    const nx = Math.min(1, Math.max(0, (e.clientX - wrapRect.left - box.left) / box.width));
-    const ny = Math.min(1, Math.max(0, (e.clientY - wrapRect.top - box.top) / box.height));
-    socket.emit('pointer-move', { roomId, sharerSocketId: focusedShareId, x: nx, y: ny });
-  }
-
-  function emitPointerHide() {
-    if (socket && roomId && focusedShareId) socket.emit('pointer-hide', { roomId, sharerSocketId: focusedShareId });
-  }
-
-  function positionPointerDot(dot) {
-    const video = $('#stage-video');
-    const wrap = $('#stage-video-wrap');
-    if (!video || !wrap) return;
-    const box = getContainedVideoBox(video, wrap.getBoundingClientRect());
-    dot.style.left = `${box.left + parseFloat(dot.dataset.nx) * box.width}px`;
-    dot.style.top = `${box.top + parseFloat(dot.dataset.ny) * box.height}px`;
-  }
-
-  function renderPointerDot(data) {
-    const layer = $('#stage-pointer-layer');
-    if (!layer || data.socketId === mySocketId) return;
-    let dot = layer.querySelector(`[data-pointer="${data.socketId}"]`);
-    if (!dot) {
-      dot = document.createElement('div');
-      dot.className = 'pointer-dot';
-      dot.dataset.pointer = data.socketId;
-      dot.innerHTML = `<span class="pointer-label"></span>`;
-      layer.appendChild(dot);
-      ensurePointerResizeObserver();
-    }
-    dot.style.color = getPointerColor(data.name);
-    dot.dataset.nx = data.x;
-    dot.dataset.ny = data.y;
-    dot.querySelector('.pointer-label').textContent = data.name;
-    dot.classList.remove('fading');
-    positionPointerDot(dot);
-
-    clearTimeout(pointerFadeTimers[data.socketId]);
-    pointerFadeTimers[data.socketId] = setTimeout(() => dot.classList.add('fading'), 1000);
-  }
-
-  function removePointerDot(socketId) {
-    clearTimeout(pointerFadeTimers[socketId]);
-    delete pointerFadeTimers[socketId];
-    $('#stage-pointer-layer')?.querySelector(`[data-pointer="${socketId}"]`)?.remove();
-  }
-
-  function clearAllPointers() {
-    Object.keys(pointerFadeTimers).forEach(id => clearTimeout(pointerFadeTimers[id]));
-    pointerFadeTimers = {};
-    const layer = $('#stage-pointer-layer');
-    if (layer) layer.innerHTML = '';
-  }
-
-  // A stationary pointer between throttled emits would go stale for up to
-  // ~1s if the viewer's own window resizes — one shared observer re-runs
-  // the position math for whatever dots currently exist (cheap, at most a handful).
-  function ensurePointerResizeObserver() {
-    if (pointerResizeObserver || !window.ResizeObserver) return;
-    const wrap = $('#stage-video-wrap');
-    if (!wrap) return;
-    pointerResizeObserver = new ResizeObserver(() => {
-      $('#stage-pointer-layer')?.querySelectorAll('.pointer-dot').forEach(positionPointerDot);
-    });
-    pointerResizeObserver.observe(wrap);
   }
 
   function updateUserCardAudio(socketId, stream) {
@@ -2466,7 +2381,6 @@
       UI_SOUNDS.play('leave');
       const name = peers[data.socketId]?.name || 'Someone';
       removePeerFromGrid(data.socketId);
-      removePointerDot(data.socketId); // in case they were pointing at whatever we're watching
       // Drop any stream they were sharing
       if (screenShares[data.socketId]) {
         delete screenShares[data.socketId];
@@ -2762,9 +2676,6 @@
       // sync for isScreen classification.
       if (screenShares[data.socketId]) screenShares[data.socketId].streamId = data.streamId;
     });
-
-    socket.on('pointer-move', (data) => renderPointerDot(data));
-    socket.on('pointer-hide', (data) => removePointerDot(data.socketId));
 
     socket.on('screen-share-denied', (data) => {
       const msg = data && data.reason === 'limit'
@@ -3868,6 +3779,26 @@
     $('#stage-stop')?.addEventListener('click', () => stopScreenShare());
     $('#stage-pause')?.addEventListener('click', () => togglePauseScreenShare());
     $('#stage-switch-source')?.addEventListener('click', switchScreenSource);
+
+    $('#stage-quality')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dd = $('#stage-quality-dropdown');
+      if (!dd) return;
+      if (!dd.classList.contains('open')) {
+        $('#live-resolution').value = shareResolution;
+        $('#live-fps').value = String(shareFps);
+      }
+      dd.classList.toggle('open');
+    });
+    $('#live-resolution')?.addEventListener('change', (e) => applyLiveQuality({ resolution: e.target.value }));
+    $('#live-fps')?.addEventListener('change', (e) => applyLiveQuality({ fps: parseInt(e.target.value) }));
+
+    document.addEventListener('click', (e) => {
+      const dd = $('#stage-quality-dropdown');
+      if (dd && !e.target.closest('#stage-quality-dropdown') && !e.target.closest('#stage-quality')) {
+        dd.classList.remove('open');
+      }
+    });
     $('#stage-fullscreen')?.addEventListener('click', () => {
       const wrap = $('#stage-video-wrap');
       if (document.fullscreenElement) {
@@ -3893,10 +3824,6 @@
         console.warn('[VoiceWave] PiP error:', err);
       }
     });
-
-    $('#stage-laser')?.addEventListener('click', () => toggleLaserPointer());
-    $('#stage-video-wrap')?.addEventListener('mousemove', handleStageMouseMove);
-    $('#stage-video-wrap')?.addEventListener('mouseleave', () => { if (laserPointerActive) emitPointerHide(); });
 
     // Per-stream volume (remote shares only; own preview is always muted)
     const stageVolSlider = $('#stage-volume');
@@ -3969,8 +3896,9 @@
     });
     $('#active-polls-close')?.addEventListener('click', () => $('#active-polls-modal').classList.remove('open'));
 
-    // Create Polls Modal
-    $('#btn-polls-trigger')?.addEventListener('click', () => {
+    // Create Polls Modal — reachable from the room header (desktop) and from
+    // inside the chat panel (mobile, where the header trigger is hidden).
+    function openCreatePollModal() {
       const isCreatorLocalUser = isCreatorLocal();
       const isModLocalUser = isModLocal();
       if (!isCreatorLocalUser && !isModLocalUser) {
@@ -3985,7 +3913,9 @@
         <input type="text" class="poll-option-input" placeholder="Option 2" style="margin-bottom:8px;">
       `;
       $('#polls-modal').classList.add('open');
-    });
+    }
+    $('#btn-polls-trigger')?.addEventListener('click', openCreatePollModal);
+    $('#btn-create-poll-chat')?.addEventListener('click', openCreatePollModal);
     $('#polls-close')?.addEventListener('click', () => $('#polls-modal').classList.remove('open'));
 
     $('#btn-add-poll-option')?.addEventListener('click', () => {
@@ -4208,8 +4138,6 @@
       if (liveCard && !e.target.closest('.user-actions')) {
         const socketId = liveCard.dataset.socket;
         if (screenShares[socketId]) {
-          if (laserPointerActive) emitPointerHide();
-          clearAllPointers();
           focusedShareId = socketId;
           renderScreenShares();
         }

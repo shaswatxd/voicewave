@@ -2138,6 +2138,20 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
 /* ── INVITE OPTIONS DROPDOWN (creator-only, reuses participants-dropdown base) ── */
 .invite-options-dropdown { width: 220px; }
 
+/* ── LIVE STREAM QUALITY DROPDOWN (sharer-only, reuses participants-dropdown base) ── */
+.stage-quality-dropdown { width: 200px; right: auto; left: 0; }
+
+/* ── MOBILE ROOM HEADER DECLUTTER ──
+   Lock/permissions/create-poll are rarely-used host tools that used to wrap
+   the header into a cramped second row on phones. Poll creation moves into
+   the chat panel (➕ next to Active Polls); lock/permissions stay reachable
+   from desktop/tablet widths where there's room for them. */
+.is-mobile #btn-room-lock,
+.is-mobile #btn-permissions-modal,
+.is-mobile #btn-polls-trigger {
+  display: none !important;
+}
+
 /* ── KEYBOARD SHORTCUTS MODAL ── */
 .shortcuts-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .shortcut-row {
@@ -2247,7 +2261,7 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
 }
 
 /* ════════════════════════════════════════════════════════════
-   Pause/Resume, Source Switch, Packet-Loss, Laser Pointer
+   Pause/Resume, Source Switch, Packet-Loss
    ════════════════════════════════════════════════════════════ */
 
 /* ── PAUSED BADGE (mirrors .stage-waiting) ── */
@@ -2260,38 +2274,6 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
   z-index: 3;
 }
 .stage-paused-badge.show { display: flex; }
-
-/* ── LASER POINTER OVERLAY ── */
-#stage-pointer-layer {
-  position: absolute; inset: 0;
-  pointer-events: none;
-  z-index: 4;
-  overflow: hidden;
-}
-.pointer-dot {
-  position: absolute;
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  border: 2px solid #fff;
-  box-shadow: 0 0 10px currentColor, 0 0 2px rgba(0,0,0,0.6);
-  transform: translate(-50%, -50%);
-  transition: opacity 0.4s ease, left 0.05s linear, top 0.05s linear;
-  opacity: 1;
-}
-.pointer-dot.fading { opacity: 0; }
-.pointer-label {
-  position: absolute;
-  top: 16px; left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  padding: 2px 7px;
-  background: currentColor;
-  color: #000;
-  border-radius: 5px;
-  font-size: 0.62rem; font-weight: 700;
-}
-.stage-video-wrap.laser-active { cursor: crosshair; }
-.stage-btn.laser-on { background: rgba(34,211,238,0.18); color: var(--cyan); border-color: rgba(34,211,238,0.4); }
 
 /* ── PAUSE / SWITCH BUTTON STATES ── */
 .stage-btn.stage-pause.active { background: rgba(250,204,21,0.15); color: #facc15; border-color: rgba(250,204,21,0.35); }
