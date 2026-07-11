@@ -782,7 +782,6 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  overflow: hidden;
   position: relative;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
@@ -791,16 +790,37 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
 .profile-banner {
   height: 72px;
   width: 100%;
-  background: linear-gradient(135deg,
-    rgba(34, 211, 238, 0.15) 0%,
-    rgba(168, 85, 247, 0.15) 100%);
+  border-radius: 11px 11px 0 0;
+  background: linear-gradient(120deg,
+    rgba(34, 211, 238, 0.28) 0%,
+    rgba(168, 85, 247, 0.28) 35%,
+    rgba(236, 72, 153, 0.28) 65%,
+    rgba(34, 211, 238, 0.28) 100%);
+  background-size: 300% 300%;
   position: relative;
   flex-shrink: 0;
-  animation: bannerSlide 0.4s ease-out;
+  overflow: hidden;
+  animation: bannerSlide 0.4s ease-out, bannerFlow 8s ease-in-out infinite;
+}
+.profile-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 40%, rgba(255,255,255,0.16), transparent 55%);
+  animation: bannerShine 6s ease-in-out infinite;
 }
 @keyframes bannerSlide {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@keyframes bannerFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes bannerShine {
+  0%, 100% { transform: translateX(-10%) translateY(-5%); opacity: 0.7; }
+  50% { transform: translateX(10%) translateY(5%); opacity: 1; }
 }
 
 /* ── Avatar ── */
@@ -901,12 +921,15 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
   box-sizing: border-box;
 }
 .profile-form .form-group {
+  position: relative;
+  z-index: 1;
   animation: formFade 0.35s ease both;
 }
 .profile-form .form-group:nth-child(1) { animation-delay: 0.15s; }
 .profile-form .form-group:nth-child(2) { animation-delay: 0.2s; }
 .profile-form .form-group:nth-child(3) { animation-delay: 0.25s; }
 .profile-form .form-group:nth-child(4) { animation-delay: 0.3s; }
+.profile-form .form-group:has(.custom-select.open) { z-index: 50; }
 .profile-form .profile-remove-btn { animation: formFade 0.35s ease 0.35s both; }
 @keyframes formFade {
   from { opacity: 0; transform: translateY(8px); }
