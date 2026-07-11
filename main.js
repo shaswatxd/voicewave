@@ -69,31 +69,15 @@ function getLoadingHTML() {
 </style></head>
 <body><div class="container">
   <svg class="logo-svg" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#0a0518" />
-        <stop offset="55%" stop-color="#050311" />
-        <stop offset="100%" stop-color="#020103" />
-      </linearGradient>
-      <linearGradient id="border-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#22d3ee" />
-        <stop offset="50%" stop-color="#a855f7" />
-        <stop offset="100%" stop-color="#22d3ee" />
-      </linearGradient>
-      <linearGradient id="wave-grad" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stop-color="#e0f7ff" />
-        <stop offset="45%" stop-color="#22d3ee" />
-        <stop offset="100%" stop-color="#a855f7" />
-      </linearGradient>
-    </defs>
-    <!-- Crisp, no-blur variant (matches assets/tray.png) — this loading
-         screen renders small, and blur filters just look muddy at that size -->
-    <rect x="6" y="6" width="500" height="500" rx="118" fill="url(#bg-grad)" stroke="url(#border-grad)" stroke-width="14" />
-    <rect x="153" y="208" width="34" height="96" rx="17" fill="url(#wave-grad)" />
-    <rect x="199" y="168" width="34" height="176" rx="17" fill="url(#wave-grad)" />
+    <!-- Flat solid colors, no <defs>/gradients — gradient url(#id) refs can
+         fail to resolve when this markup is served through a data: URL, so
+         this uses only plain fills to guarantee it always renders. -->
+    <rect x="6" y="6" width="500" height="500" rx="118" fill="#0a0518" stroke="#22d3ee" stroke-width="14" />
+    <rect x="153" y="208" width="34" height="96" rx="17" fill="#22d3ee" />
+    <rect x="199" y="168" width="34" height="176" rx="17" fill="#22d3ee" />
     <rect x="245" y="128" width="34" height="256" rx="17" fill="#ffffff" />
-    <rect x="291" y="168" width="34" height="176" rx="17" fill="url(#wave-grad)" />
-    <rect x="337" y="208" width="34" height="96" rx="17" fill="url(#wave-grad)" />
+    <rect x="291" y="168" width="34" height="176" rx="17" fill="#a855f7" />
+    <rect x="337" y="208" width="34" height="96" rx="17" fill="#a855f7" />
   </svg>
   <h1>VoiceWave</h1>
   <p class="status" id="status">Connecting to server...</p>

@@ -13,7 +13,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.89">
+<link rel="stylesheet" href="/app.css?v=1.0.90">
 <!-- Consolidated Styles moved to app.css -->
 </head>
 <body>
@@ -145,7 +145,7 @@
           <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
             <div class="custom-select" id="status-select-wrap">
               <button type="button" class="custom-select-trigger" id="profile-status-trigger">
-                <span id="profile-status-trigger-label">🟢 Online</span>
+                <span class="custom-select-label" id="profile-status-trigger-label">🟢 Online</span>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
               </button>
               <div class="custom-select-menu" id="profile-status-menu">
@@ -160,7 +160,7 @@
             <div class="custom-select" id="avatar-color-select-wrap" style="margin-top: 4px;">
               <button type="button" class="custom-select-trigger" id="profile-avatar-color-trigger">
                 <span class="color-swatch avatar-accent-cyan" id="profile-avatar-color-swatch"></span>
-                <span id="profile-avatar-color-trigger-label">Cyan Glow</span>
+                <span class="custom-select-label" id="profile-avatar-color-trigger-label">Cyan Glow</span>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
               </button>
               <div class="custom-select-menu" id="profile-avatar-color-menu">
@@ -769,7 +769,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.89';
+  window.APP_VERSION = '1.0.90';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -815,6 +815,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.89"></script>
+<script src="/app.js?v=1.0.90"></script>
 </body>
 </html>
