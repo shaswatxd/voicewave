@@ -791,34 +791,19 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
   height: 72px;
   width: 100%;
   border-radius: 11px 11px 0 0;
-  background: linear-gradient(120deg,
-    rgba(34, 211, 238, 0.28) 0%,
-    rgba(168, 85, 247, 0.28) 35%,
-    rgba(236, 72, 153, 0.28) 65%,
-    rgba(34, 211, 238, 0.28) 100%);
-  background-size: 300% 300%;
+  background: linear-gradient(135deg,
+    rgba(34, 211, 238, 0.15) 0%,
+    rgba(168, 85, 247, 0.15) 100%);
   position: relative;
   flex-shrink: 0;
   overflow: hidden;
-  animation: bannerSlide 0.4s ease-out, bannerFlow 8s ease-in-out infinite;
-}
-.profile-banner::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 30% 40%, rgba(255,255,255,0.16), transparent 55%);
-  animation: bannerShine 6s ease-in-out infinite;
+  animation: bannerSlide 0.4s ease-out;
 }
 @keyframes bannerSlide {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes bannerFlow {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-@keyframes bannerShine {
+@keyframes bannerShine_unused {
   0%, 100% { transform: translateX(-10%) translateY(-5%); opacity: 0.7; }
   50% { transform: translateX(10%) translateY(5%); opacity: 1; }
 }
