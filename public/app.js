@@ -229,11 +229,7 @@
   }
 
   function updateProfileDisplayName() {
-    const nameDisplay = $('#profile-name-display');
     const initial = $('#profile-avatar-initial');
-    if (nameDisplay && window.userName) {
-      nameDisplay.textContent = window.userName;
-    }
     if (initial && window.userName) {
       initial.textContent = getInitial(window.userName);
     }
@@ -248,92 +244,11 @@
     else if (myStatus === 'invisible') dot.classList.add('status-invisible');
   }
 
-  function updateProfileStatusText() {
-    const el = $('#profile-status-text-display');
-    if (el) {
-      el.textContent = myStatusText || '';
-      el.style.display = myStatusText ? 'block' : 'none';
-    }
-  }
-
-  function updateProfileStats() {
-    const rooms = parseInt(localStorage.getItem('vw_rooms_joined') || '0');
-    const hours = parseInt(localStorage.getItem('vw_hours_listening') || '0');
-    const since = localStorage.getItem('vw_member_since');
-    const roomsEl = $('#stat-rooms');
-    const hoursEl = $('#stat-hours');
-    const sinceEl = $('#stat-since');
-    if (roomsEl) roomsEl.textContent = rooms;
-    if (hoursEl) hoursEl.textContent = hours >= 24 ? Math.floor(hours / 24) + 'd' : hours + 'h';
-    if (sinceEl) {
-      if (since) {
-        const d = new Date(parseInt(since));
-        sinceEl.textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      } else {
-        const now = Date.now();
-        localStorage.setItem('vw_member_since', now.toString());
-        sinceEl.textContent = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      }
-    }
-  }
-
   function initProfile() {
     createBannerParticles();
     updateProfileDisplayName();
     updateProfileStatusDot();
-    updateProfileStatusText();
-    updateProfileStats();
     updateProfileAvatarColorOrText();
-
-    // Status buttons
-    const statusBtns = $$('.status-btn');
-    statusBtns.forEach(btn => {
-      if (btn.dataset.status === myStatus) btn.classList.add('active');
-      else btn.classList.remove('active');
-      btn.addEventListener('click', () => {
-        statusBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        myStatus = btn.dataset.status;
-        localStorage.setItem('vw_status', myStatus);
-        updateProfileStatusDot();
-        toast('Status updated', 'success');
-      });
-    });
-
-    // Color picker
-    const colorBtns = $$('.color-swatch-btn');
-    colorBtns.forEach(btn => {
-      if (btn.dataset.color === myAvatarColor) btn.classList.add('active');
-      else btn.classList.remove('active');
-      btn.addEventListener('click', () => {
-        colorBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        myAvatarColor = btn.dataset.color;
-        localStorage.setItem('vw_avatar_color', myAvatarColor);
-        updateProfileAvatarColorOrText();
-      });
-    });
-
-    // Status text input
-    const statusInput = $('#profile-status-input');
-    const statusCount = $('#status-char-count');
-    if (statusInput) {
-      statusInput.value = myStatusText;
-      if (statusCount) statusCount.textContent = myStatusText.length + '/50';
-      statusInput.addEventListener('input', (e) => {
-        myStatusText = e.target.value.trim();
-        localStorage.setItem('vw_status_text', myStatusText);
-        if (statusCount) statusCount.textContent = myStatusText.length + '/50';
-        updateProfileStatusText();
-      });
-    }
-
-    // Name char count
-    const nameInput = $('#profile-display-name-input');
-    const nameCount = $('#name-char-count');
-    if (nameInput && nameCount) {
-      nameCount.textContent = (nameInput.value || '').length + '/20';
-    }
   }
 
   // ── SCREEN SHARE STATE (Discord-style: many people can stream at once) ──
@@ -533,7 +448,6 @@
         nameEl.value = window.userName;
       }
     }
-    updateProfileDisplayName();
     updateProfileAvatarColorOrText();
   }
 
@@ -2250,11 +2164,6 @@
   }
 
   function beginConnecting() {
-    // Track room join stats
-    const rooms = parseInt(localStorage.getItem('vw_rooms_joined') || '0');
-    localStorage.setItem('vw_rooms_joined', rooms + 1);
-    updateProfileStats();
-
     const overlay = $('#connecting-overlay');
     if (overlay.classList.contains('show')) return; // already mid-attempt — don't stack timers
     overlay.classList.add('show');
@@ -4153,15 +4062,6 @@
 
     const updateProfileName = (name, originEl = null) => {
       window.userName = name;
-      const initialEl = $('#profile-avatar-initial');
-      if (initialEl) {
-        initialEl.textContent = getInitial(name);
-      }
-      const nameDisplay = $('#profile-display-name-input');
-      const nameCount = $('#name-char-count');
-      if (nameCount && nameDisplay) {
-        nameCount.textContent = name.length + '/20';
-      }
       updateProfileDisplayName();
       try {
         localStorage.setItem('vw_username', name);
