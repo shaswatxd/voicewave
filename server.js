@@ -292,6 +292,22 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('screen-share-stopped', { socketId: socket.id });
   });
 
+  // 🔊 Device audio share (system/loopback audio, no video) — independent of deafen
+  socket.on('device-audio-share-start', ({ roomId, streamId }) => {
+    const room = rooms.get(roomId);
+    if (!room || !room.users.has(socket.id)) return;
+    if (!room.deviceAudioShares) room.deviceAudioShares = {};
+    room.deviceAudioShares[socket.id] = { socketId: socket.id, name: socket.userName, streamId };
+    io.to(roomId).emit('device-audio-share-started', { socketId: socket.id, name: socket.userName, streamId });
+  });
+
+  socket.on('device-audio-share-stop', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (!room || !room.deviceAudioShares || !room.deviceAudioShares[socket.id]) return;
+    delete room.deviceAudioShares[socket.id];
+    io.to(roomId).emit('device-audio-share-stopped', { socketId: socket.id });
+  });
+
   socket.on('screen-share-pause', ({ roomId }) => {
     const room = rooms.get(roomId);
     const share = room?.screenShares?.[socket.id];
@@ -579,6 +595,10 @@ io.on('connection', (socket) => {
         delete room.screenShares[targetId];
         io.to(roomId).emit('screen-share-stopped', { socketId: targetId });
       }
+      if (room.deviceAudioShares && room.deviceAudioShares[targetId]) {
+        delete room.deviceAudioShares[targetId];
+        io.to(roomId).emit('device-audio-share-stopped', { socketId: targetId });
+      }
       room.users.delete(targetId);
       io.to(roomId).emit('peer-left', { socketId: targetId });
     }
@@ -645,6 +665,10 @@ io.on('connection', (socket) => {
     if (room.screenShares && room.screenShares[sock.id]) {
       delete room.screenShares[sock.id];
       io.to(roomId).emit('screen-share-stopped', { socketId: sock.id });
+    }
+    if (room.deviceAudioShares && room.deviceAudioShares[sock.id]) {
+      delete room.deviceAudioShares[sock.id];
+      io.to(roomId).emit('device-audio-share-stopped', { socketId: sock.id });
     }
 
     io.to(roomId).emit('peer-left', { socketId: sock.id });

@@ -750,7 +750,7 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
 .profile-sidebar {
   width: 280px;
   flex-shrink: 0;
-  background: var(--bg-sidebar);
+  background: transparent;
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -779,9 +779,10 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
   flex-direction: column;
   align-items: center;
   width: 100%;
-  background: var(--bg-card);
+  background: var(--glass);
+  backdrop-filter: blur(20px);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   position: relative;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
@@ -791,7 +792,7 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
   height: 72px;
   width: 100%;
   border-radius: 11px 11px 0 0;
-  background: var(--bg-card);
+  background: transparent;
   position: relative;
   flex-shrink: 0;
   overflow: hidden;
@@ -932,15 +933,15 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
 }
 .profile-input-wrapper input {
   width: 100%;
-  padding: 9px 12px;
-  background: var(--bg-input);
+  padding: 12px 14px;
+  background: var(--glass);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text);
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-family: inherit;
   font-weight: 500;
-  text-align: center;
+  text-align: left;
   outline: none;
   box-sizing: border-box;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -955,16 +956,18 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-size: 0.72rem !important;
-  padding: 6px 12px !important;
+  font-size: 0.78rem !important;
+  padding: 9px 12px !important;
+  background: var(--glass) !important;
   color: var(--danger) !important;
-  border-color: rgba(239, 68, 68, 0.15) !important;
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+  border-radius: 10px;
   margin-top: 8px;
   transition: all 0.15s ease !important;
 }
 .profile-remove-btn:hover {
-  background: rgba(239, 68, 68, 0.08) !important;
-  border-color: rgba(239, 68, 68, 0.3) !important;
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(239, 68, 68, 0.5) !important;
 }
 
 /* ── CUSTOM SELECT (status / avatar color) ──
@@ -976,12 +979,12 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
 .custom-select-trigger {
   display: flex; align-items: center; gap: 8px;
   width: 100%; box-sizing: border-box;
-  padding: 8px 12px;
-  background: rgba(255,255,255,0.03);
+  padding: 10px 12px;
+  background: var(--glass);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text);
-  font-size: 0.78rem; font-family: inherit;
+  font-size: 0.8rem; font-family: inherit;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }

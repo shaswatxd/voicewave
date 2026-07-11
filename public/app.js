@@ -21,11 +21,15 @@
   // Curated static set — no external emoji API/CDN, keeps the app fully
   // offline-friendly and CSP-free.
   const EMOJI_CATEGORIES = {
-    'Smileys': ['😀','😁','😂','🤣','😊','😇','🙂','😉','😍','🥰','😘','😜','🤪','😎','🥳','😏','😴','🤯','🥺','😭','😤','😡','🤔','🤫','🙄','😬','🤐','😷','🤒','🥶'],
-    'Gestures': ['👍','👎','👏','🙌','🙏','💪','🤝','👋','✌️','🤞','🤟','🤙','👌','✊','🫡','🤌','👉','👈','☝️','🖐️'],
-    'Hearts': ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','💔','💕','💞','💗','💖','💘','😻'],
-    'Objects': ['🔥','✨','🎉','🎊','💯','⭐','🌟','💤','💡','🎮','🎧','📷','🏆','🎵','🎤','⚡','💀','👻','🤖','🎁'],
-    'Animals': ['🐶','🐱','🦊','🐻','🐼','🐨','🐸','🐵','🦁','🐯','🐷','🐔','🦄','🐝','🦋']
+    'Smileys & Emotion': ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','🫠','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🫢','🫣','🤫','🤔','🫡','🤐','🤨','😐','😑','😶','🫥','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧','🥵','🥶','🥴','😵','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','🫤','😟','🙁','😮','😯','😲','😳','🥺','🥹','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖','😺','😸','😹','😻','😼','😽','🙀','😿','😾'],
+    'People & Body': ['👋','🤚','🖐️','✋','🖖','🫱','🫲','🫳','🫴','👌','🤌','🤏','✌️','🤞','🫰','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','🫶','👐','🤲','🤝','🙏','✍️','💅','🤳','💪','🦾','🦵','🦿','🦶','👂','🦻','👃','🧠','🫀','🫁','🦷','🦴','👀','👁️','👅','👄','🫦','👶','🧒','👦','👧','🧑','👱','👨','🧔','👩','🧓','👴','👵','🙍','🙎','🙅','🙆','💁','🙋','🧏','🙇','🤦','🤷','👮','🕵️','💂','🥷','👷','🤴','👸','👳','👲','🧕','🤵','👰','🤰','🫃','🫄','🤱','👼','🎅','🤶','🦸','🦹','🧙','🧚','🧛','🧜','🧝','🧞','🧟','💆','💇','🚶','🧍','🧎','🏃','💃','🕺','🕴️','👯','🧖','🧗','🤺','🏇','⛷️','🏂','🏌️','🏄','🚣','🏊','⛹️','🏋️','🚴','🚵','🤸','🤼','🤽','🤾','🤹','🧘'],
+    'Animals & Nature': ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐻‍❄️','🐨','🐯','🦁','🐮','🐷','🐽','🐸','🐵','🙈','🙉','🙊','🐒','🐔','🐧','🐦','🐤','🐣','🐥','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🪱','🐛','🦋','🐌','🐞','🐜','🪰','🪲','🪳','🦟','🦗','🕷️','🕸️','🦂','🐢','🐍','🦎','🦖','🦕','🐙','🦑','🦐','🦞','🦀','🐡','🐠','🐟','🐬','🐳','🐋','🦈','🐊','🐅','🐆','🦓','🦍','🦧','🦣','🐘','🦛','🦏','🐪','🐫','🦒','🦘','🦬','🐃','🐂','🐄','🐎','🐖','🐏','🐑','🦙','🐐','🦌','🐕','🐩','🦮','🐈','🐈‍⬛','🐓','🦃','🦤','🦚','🦜','🦢','🦩','🕊️','🐇','🦝','🦨','🦡','🦫','🦦','🦥','🐁','🐀','🐿️','🦔','🐾','🌵','🎄','🌲','🌳','🌴','🪵','🌱','🌿','☘️','🍀','🎍','🪴','🎋','🍃','🍂','🍁','🍄','🐚','🪨','🌾','💐','🌷','🌹','🥀','🪻','🌺','🌸','🌼','🌻','🌞','🌝','🌛','🌜','🌚','🌕','🌖','🌗','🌘','🌑','🌒','🌓','🌔','🌙','🌎','🌍','🌏','🪐','💫','⭐','🌟','✨','⚡','☄️','💥','🔥','🌪️','🌈','☀️','🌤️','⛅','🌦️','🌧️','⛈️','🌩️','🌨️','❄️','☃️','⛄','🌬️','💨','💧','💦','☔','☂️','🌊','🌫️'],
+    'Food & Drink': ['🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🥬','🥒','🌶️','🫑','🌽','🥕','🫒','🧄','🧅','🥔','🍠','🥐','🥯','🍞','🥖','🥨','🧀','🥚','🍳','🧈','🥞','🧇','🥓','🥩','🍗','🍖','🦴','🌭','🍔','🍟','🍕','🫓','🥪','🥙','🧆','🌮','🌯','🫔','🥗','🥘','🫕','🥫','🍝','🍜','🍲','🍛','🍣','🍱','🥟','🦪','🍤','🍙','🍚','🍘','🍥','🥠','🥮','🍢','🍡','🍧','🍨','🍦','🥧','🧁','🍰','🎂','🍮','🍭','🍬','🍫','🍿','🍩','🍪','🌰','🥜','🍯','🥛','🍼','🫖','☕','🍵','🧃','🥤','🧋','🍶','🍺','🍻','🥂','🍷','🥃','🍸','🍹','🧉','🍾','🧊','🥄','🍴','🍽️','🥣','🥡','🥢','🧂'],
+    'Travel & Places': ['🚗','🚕','🚙','🚌','🚎','🏎️','🚓','🚑','🚒','🚐','🛻','🚚','🚛','🚜','🦯','🦽','🦼','🛴','🚲','🛵','🏍️','🛺','🚨','🚔','🚍','🚘','🚖','🚡','🚠','🚟','🚃','🚋','🚞','🚝','🚄','🚅','🚈','🚂','🚆','🚇','🚊','🚉','✈️','🛫','🛬','🛩️','💺','🛰️','🚀','🛸','🚁','🛶','⛵','🚤','🛥️','🛳️','⛴️','🚢','⚓','🪝','⛽','🚧','🚦','🚥','🚏','🗺️','🗿','🗽','🗼','🏰','🏯','🏟️','🎡','🎢','🎠','⛲','⛱️','🏖️','🏝️','🏜️','🌋','⛰️','🏔️','🗻','🏕️','⛺','🏠','🏡','🏘️','🏚️','🏗️','🏭','🏢','🏬','🏣','🏤','🏥','🏦','🏨','🏪','🏫','🏩','💒','🏛️','⛪','🕌','🕍','🛕','🕋','⛩️','🛤️','🛣️','🗾','🎑','🏞️','🌅','🌄','🌠','🎇','🎆','🌇','🌆','🏙️','🌃','🌌','🌉','🌁'],
+    'Activities': ['⚽','🏀','🏈','⚾','🥎','🎾','🏐','🏉','🥏','🎱','🪀','🏓','🏸','🏒','🏑','🥍','🏏','🪃','🥅','⛳','🪁','🏹','🎣','🤿','🥊','🥋','🎽','🛹','🛼','🛷','⛸️','🥌','🎿','⛷️','🏂','🪂','🏋️','🤼','🤸','⛹️','🤺','🤾','🏌️','🏇','🧘','🏄','🏊','🤽','🚣','🧗','🚵','🚴','🏆','🥇','🥈','🥉','🏅','🎖️','🏵️','🎗️','🎫','🎟️','🎪','🤹','🎭','🩰','🎨','🎬','🎤','🎧','🎼','🎹','🥁','🪘','🎷','🎺','🪗','🎸','🪕','🎻','🎲','♟️','🎯','🎳','🎮','🎰','🧩'],
+    'Objects': ['⌚','📱','💻','⌨️','🖥️','🖨️','🖱️','🖲️','🕹️','🗜️','💽','💾','💿','📀','📼','📷','📸','📹','🎥','📽️','🎞️','📞','☎️','📟','📠','📺','📻','🎙️','🎚️','🎛️','🧭','⏱️','⏲️','⏰','🕰️','⌛','⏳','📡','🔋','🪫','🔌','💡','🔦','🕯️','🪔','🧯','🛢️','💸','💵','💴','💶','💷','🪙','💰','💳','🪪','💎','⚖️','🪜','🧰','🪛','🔧','🔨','⚒️','🛠️','⛏️','🪚','🔩','⚙️','🪤','🧱','⛓️','🧲','🔫','💣','🧨','🪓','🔪','🗡️','⚔️','🛡️','🚬','⚰️','🪦','⚱️','🏺','🔮','📿','🧿','🪬','💈','⚗️','🔭','🔬','🕳️','🩹','💊','💉','🩸','🧬','🦠','🧫','🧪','🌡️','🧹','🪠','🧺','🧻','🚽','🚰','🚿','🛁','🛀','🧼','🪥','🪒','🧴','🧷','🧵','🪡','🧶','🪢','👓','🕶️','🥽','🥼','🦺','👔','👕','👖','🧣','🧤','🧥','🧦','👗','👘','🥻','🩱','🩲','🩳','👙','👚','🪭','👛','👜','👝','🛍️','🎒','🩴','👞','👟','🥾','🥿','👠','👡','🩰','👢','👑','👒','🎩','🎓','🧢','🪖','⛑️','📿','💄','💍','💼'],
+    'Symbols': ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟','☮️','✝️','☪️','🕉️','☸️','✡️','🔯','🕎','☯️','☦️','🛐','⛎','♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓','🆔','⚛️','🉑','☢️','☣️','📴','📳','🈶','🈚','🈸','🈺','🈷️','✴️','🆚','💮','🉐','㊙️','㊗️','🈴','🈵','🈹','🈲','🅰️','🅱️','🆎','🆑','🅾️','🆘','❌','⭕','🛑','⛔','📛','🚫','💯','💢','♨️','🚷','🚯','🚳','🚱','🔞','📵','🚭','❗','❕','❓','❔','‼️','⁉️','🔅','🔆','〽️','⚠️','🚸','🔱','⚜️','🔰','♻️','✅','🈯','💹','❇️','✳️','❎','🌐','💠','Ⓜ️','🌀','💤','🏧','🚾','♿','🅿️','🈳','🈂️','🛂','🛃','🛄','🛅','🚹','🚺','🚼','⚧️','🚻','🚮','🎦','📶','🈁','🔣','ℹ️','🔤','🔡','🔠','🆖','🆗','🆙','🆒','🆕','🆓','0️⃣','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟','🔢','#️⃣','*️⃣','⏏️','▶️','⏸️','⏯️','⏹️','⏺️','⏭️','⏮️','⏩','⏪','⏫','⏬','◀️','🔼','🔽','➡️','⬅️','⬆️','⬇️','↗️','↘️','↙️','↖️','↕️','↔️','↪️','↩️','⤴️','⤵️','🔀','🔁','🔂','🔄','🔃','🎵','🎶','➕','➖','➗','✖️','🟰','♾️','💲','💱','™️','©️','®️','👁️‍🗨️','🔚','🔙','🔛','🔝','🔜','〰️','➰','➿','✔️','☑️','🔘','🔴','🟠','🟡','🟢','🔵','🟣','⚫','⚪','🟤','🔺','🔻','🔸','🔹','🔶','🔷','🔳','🔲','▪️','▫️','◾','◽','◼️','◻️','⬛','⬜','🟥','🟧','🟨','🟩','🟦','🟪','🟫'],
+    'Flags': ['🏁','🚩','🎌','🏴','🏳️','🏳️‍🌈','🏳️‍⚧️','🏴‍☠️','🇺🇳','🇮🇳','🇺🇸','🇬🇧','🇨🇦','🇦🇺','🇩🇪','🇫🇷','🇮🇹','🇪🇸','🇵🇹','🇷🇺','🇨🇳','🇯🇵','🇰🇷','🇧🇷','🇲🇽','🇿🇦','🇳🇬','🇪🇬','🇸🇦','🇦🇪','🇵🇰','🇧🇩','🇳🇵','🇱🇰','🇮🇩','🇹🇭','🇻🇳','🇵🇭','🇲🇾','🇸🇬','🇳🇿','🇳🇱','🇸🇪','🇳🇴','🇫🇮','🇩🇰','🇨🇭','🇦🇹','🇧🇪','🇵🇱','🇬🇷','🇹🇷','🇮🇱','🇮🇪','🇮🇸']
   };
 
   const STATUS_MAP = {
@@ -271,6 +275,11 @@
   let pickerSourceType = 'screen';
   let micAcquirePromise = null; // pre-acquired mic promise (started on join click)
   let remoteAnalysers = {};     // socketId -> AnalyserNode for remote speaking detection
+
+  // ── DEVICE AUDIO SHARE (system/loopback audio, no video) — sends even while self-deafened ──
+  let deviceAudioStream = null;
+  let isSharingDeviceAudio = false;
+  let deviceAudioShares = {};   // socketId -> { socketId, name, streamId } — who's sharing device audio
 
   let pinnedMessages = [];
   let activePolls = [];
@@ -802,6 +811,9 @@
     if (isScreenSharing && screenStream) {
       screenStream.getTracks().forEach(track => { pc.addTrack(track, screenStream); addedTracks++; });
     }
+    if (isSharingDeviceAudio && deviceAudioStream) {
+      deviceAudioStream.getTracks().forEach(track => { pc.addTrack(track, deviceAudioStream); addedTracks++; });
+    }
     if (addedTracks === 0) {
       // No mic yet — still open a receive-only channel so we can hear others
       pc.addTransceiver('audio', { direction: 'recvonly' });
@@ -855,6 +867,18 @@
         }
         if (!focusedShareId && !manualShareFocus) focusedShareId = socketId;
         renderScreenShares();
+        return;
+      }
+      // Device-audio share: a second audio-only stream from the same peer
+      // (mic already claimed a stream id for this socketId, so a differing
+      // id here is the loopback/system-audio track, not a mic replacement).
+      const isDeviceAudio = (deviceAudioShares[socketId] && stream.id === deviceAudioShares[socketId].streamId) ||
+        (peerStreams[socketId] && stream.id !== peerStreams[socketId].id);
+      if (isDeviceAudio) {
+        if (!deviceAudioShares[socketId]) {
+          deviceAudioShares[socketId] = { socketId, name: peer.name || 'Someone', streamId: stream.id };
+        }
+        updateDeviceAudioElement(socketId, stream);
         return;
       }
       peerStreams[socketId] = stream;
@@ -1371,6 +1395,64 @@
     }
   }
 
+  // ── DEVICE AUDIO SHARE (system/loopback audio only — sends even while self-deafened) ──
+  async function startDeviceAudioShare() {
+    if (!window.electronAPI) {
+      toast('Device audio share needs the desktop app (browser tabs can\'t capture system audio)', 'error');
+      return;
+    }
+    try {
+      // No source pre-picked — main process falls back to the primary screen,
+      // we only care about the paired loopback audio track it grants.
+      window.electronAPI.selectScreenSource(null, true);
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      stream.getVideoTracks().forEach(t => t.stop());
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        toast('Could not capture system audio (Windows only, or a device/app is blocking loopback)', 'error');
+        return;
+      }
+      deviceAudioStream = new MediaStream(audioTracks);
+      isSharingDeviceAudio = true;
+      audioTracks[0].onended = () => stopDeviceAudioShare();
+
+      Object.values(peers).forEach(peer => {
+        deviceAudioStream.getTracks().forEach(track => peer.pc.addTrack(track, deviceAudioStream));
+      });
+      socket.emit('device-audio-share-start', { roomId, streamId: deviceAudioStream.id });
+
+      const btn = $('#btn-device-audio');
+      if (btn) { btn.classList.add('active'); btn.title = 'Stop sharing device audio'; }
+    } catch (err) {
+      console.error('[VoiceWave] device audio share error:', err);
+      if (err && err.name !== 'NotAllowedError') {
+        toast('Could not start device audio share: ' + (err.message || err.name), 'error');
+      }
+    }
+  }
+
+  function stopDeviceAudioShare() {
+    if (!deviceAudioStream) return;
+    const tracks = deviceAudioStream.getTracks();
+    Object.values(peers).forEach(peer => {
+      peer.pc.getSenders().forEach(sender => {
+        if (sender.track && tracks.includes(sender.track)) peer.pc.removeTrack(sender);
+      });
+    });
+    tracks.forEach(t => { t.onended = null; t.stop(); });
+    deviceAudioStream = null;
+    isSharingDeviceAudio = false;
+    if (socket && roomId) socket.emit('device-audio-share-stop', { roomId });
+
+    const btn = $('#btn-device-audio');
+    if (btn) { btn.classList.remove('active'); btn.title = 'Share device audio'; }
+  }
+
+  function toggleDeviceAudioShare() {
+    if (isSharingDeviceAudio) stopDeviceAudioShare();
+    else startDeviceAudioShare();
+  }
+
   // ── STAGE RENDERING (multi-stream, Discord-style) ──
   function getShareStream(socketId) {
     if (socketId === mySocketId) return screenStream;
@@ -1636,6 +1718,33 @@
       };
       document.addEventListener('click', resumeAudio);
     });
+  }
+
+  // Hidden per-peer <audio> elements for incoming device-audio shares — kept
+  // off the user card since there's no video, just a container in the DOM.
+  function updateDeviceAudioElement(socketId, stream) {
+    let container = $('#device-audio-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'device-audio-container';
+      container.style.display = 'none';
+      document.body.appendChild(container);
+    }
+    let audio = container.querySelector(`[data-device-audio="${socketId}"]`);
+    if (!audio) {
+      audio = document.createElement('audio');
+      audio.autoplay = true;
+      audio.dataset.deviceAudio = socketId;
+      container.appendChild(audio);
+    }
+    audio.srcObject = stream;
+    audio.volume = isDeafened ? 0 : 1;
+    audio.play().catch(() => {});
+  }
+
+  function removeDeviceAudioElement(socketId) {
+    $(`[data-device-audio="${socketId}"]`)?.remove();
+    delete deviceAudioShares[socketId];
   }
 
   function isCreatorLocal() {
@@ -2401,6 +2510,7 @@
         if (focusedShareId === data.socketId) focusedShareId = null;
         renderScreenShares();
       }
+      if (deviceAudioShares[data.socketId]) removeDeviceAudioElement(data.socketId);
       toast(`${name} left`, 'info');
     });
 
@@ -2650,6 +2760,15 @@
       if (focusedShareId === data.socketId) focusedShareId = null;
       if (lastWatchingEmit === data.socketId) lastWatchingEmit = undefined;
       renderScreenShares();
+    });
+
+    socket.on('device-audio-share-started', (data) => {
+      deviceAudioShares[data.socketId] = data;
+      if (data.socketId !== mySocketId) toast(`${data.name} is sharing device audio 🔊`, 'info');
+    });
+
+    socket.on('device-audio-share-stopped', (data) => {
+      removeDeviceAudioElement(data.socketId);
     });
 
     socket.on('watcher-count-updated', (data) => {
@@ -3128,6 +3247,13 @@
     const stageVideo = $('#stage-video');
     if (stageVideo && focusedShareId !== mySocketId) stageVideo.muted = isDeafened;
 
+    // Incoming device-audio shares from others get silenced too — but our
+    // own outgoing device-audio track is untouched (see startDeviceAudioShare),
+    // so what we're sending keeps reaching everyone else while we're deafened.
+    $$('#device-audio-container audio').forEach(audio => {
+      audio.volume = isDeafened ? 0 : 1;
+    });
+
     const btn = $('#btn-deafen');
     btn.classList.toggle('muted-state', isDeafened);
     btn.querySelector('.control-label').textContent = isDeafened ? 'Undeafen' : 'Deafen';
@@ -3208,6 +3334,9 @@
     if (isScreenSharing || screenStream) {
       stopScreenShare();
     }
+    if (isSharingDeviceAudio || deviceAudioStream) {
+      stopDeviceAudioShare();
+    }
     if (roomId) {
       socket.emit('leave-room', { roomId });
     }
@@ -3226,6 +3355,8 @@
     remoteAnalysers = {};
     screenShares = {};
     remoteScreenStreams = {};
+    deviceAudioShares = {};
+    $('#device-audio-container')?.remove();
     focusedShareId = null;
     renderScreenShares();
     setMicBanner(false);
@@ -3748,6 +3879,13 @@
         if (isScreenSharing) stopScreenShare();
         else openScreenPicker();
       });
+    }
+
+    // ── DEVICE AUDIO SHARE TRIGGER (desktop app only — Windows loopback) ──
+    const deviceAudioBtn = $('#btn-device-audio');
+    if (deviceAudioBtn && canShareScreen) {
+      deviceAudioBtn.style.display = 'flex';
+      deviceAudioBtn.addEventListener('click', toggleDeviceAudioShare);
     }
 
     $$('.picker-tab').forEach(tab => {
