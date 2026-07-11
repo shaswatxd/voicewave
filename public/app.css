@@ -1542,6 +1542,13 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
 .stage-video-wrap:fullscreen { background: #000; }
 .stage-video-wrap:fullscreen video { object-fit: contain; }
 
+/* Mobile "click to watch" prompt — slim strip (header + thumbs), not a
+   full-height black box, so an unopened share doesn't feel like it took
+   over the screen. */
+.is-mobile .screen-stage.picker-compact { flex: 0 0 auto; }
+.is-mobile .screen-stage.picker-compact .stage-video-wrap { display: none; }
+.is-mobile .screen-stage.picker-compact .stage-thumbs { border-top: none; }
+
 /* When a stage is live, user cards collapse into a compact strip */
 #room.has-stage .user-grid {
   flex: 0 0 auto;
@@ -2055,6 +2062,11 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
   color: var(--text); font-size: 0.85rem; font-family: inherit;
 }
 .chat-msg-edited-tag { font-size: 0.66rem; color: var(--muted); font-style: italic; }
+.chat-msg-action { color: var(--muted); }
+.chat-msg-seen { font-size: 0.65rem; color: var(--muted); margin-top: 2px; text-align: right; }
+
+/* ── INVITE OPTIONS DROPDOWN (creator-only, reuses participants-dropdown base) ── */
+.invite-options-dropdown { width: 220px; }
 
 /* ── KEYBOARD SHORTCUTS MODAL ── */
 .shortcuts-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }

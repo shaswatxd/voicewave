@@ -22,6 +22,10 @@ const ROOMS_FILE = path.join(__dirname, 'rooms.json');
 
 const rooms = new Map();
 
+function generateInviteToken() {
+  return Math.random().toString(36).slice(2, 8);
+}
+
 // Load persistent rooms from disk
 function loadRoomsFromDisk() {
   try {
@@ -41,7 +45,9 @@ function loadRoomsFromDisk() {
           history: r.history || [], // Last 50 chat messages
           polls: r.polls || [], // Active polls
           pinned: r.pinned || [], // Pinned messages
-          screenShares: {} // Live screen shares (never persisted)
+          screenShares: {}, // Live screen shares (never persisted)
+          inviteToken: r.inviteToken || generateInviteToken(),
+          inviteExpiresAt: r.inviteExpiresAt || null
         });
       });
       console.log(`Loaded ${rooms.size} persistent rooms from disk.`);
@@ -71,7 +77,9 @@ function saveRoomsToDisk() {
         moderators: room.moderators || [],
         history: room.history || [],
         polls: room.polls || [],
-        pinned: room.pinned || []
+        pinned: room.pinned || [],
+        inviteToken: room.inviteToken,
+        inviteExpiresAt: room.inviteExpiresAt || null
       });
     });
     fs.writeFileSync(ROOMS_FILE, JSON.stringify(data, null, 2), 'utf8');
@@ -100,7 +108,7 @@ io.on('connection', (socket) => {
   const userIp = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
   console.log(`[Connect] ${socket.id} (IP: ${userIp})`);
 
-  socket.on('join-room', ({ roomId, userName, muted, joinOnly, password, avatar }) => {
+  socket.on('join-room', ({ roomId, userName, muted, joinOnly, password, avatar, inviteToken }) => {
     if (!roomId || !userName || roomId.length > 10 || userName.length > 32) {
       socket.emit('room-not-found', { roomId });
       return;
@@ -128,7 +136,9 @@ io.on('connection', (socket) => {
         history: [],
         polls: [],
         pinned: [],
-        screenShares: {}
+        screenShares: {},
+        inviteToken: generateInviteToken(),
+        inviteExpiresAt: null
       };
       rooms.set(roomId, room);
       saveRoomsToDisk();
@@ -144,6 +154,14 @@ io.on('connection', (socket) => {
     const isBanned = room.banned.some(b => b.name === userName || b.ip === userIp);
     if (isBanned) {
       socket.emit('room-banned-error', { roomId });
+      return;
+    }
+
+    // 2b. Check invite link token/expiry — only enforced when the client
+    // actually sent one (i.e. arrived via a shared link), so manually-typed
+    // room codes and pre-feature links keep working unaffected.
+    if (inviteToken && (inviteToken !== room.inviteToken || (room.inviteExpiresAt && Date.now() > room.inviteExpiresAt))) {
+      socket.emit('invite-expired', { roomId });
       return;
     }
 
@@ -183,7 +201,8 @@ io.on('connection', (socket) => {
         isModerator: room.moderators.includes(user.name),
         status: user.status || 'online',
         handRaised: user.handRaised || false,
-        avatar: user.avatar || null
+        avatar: user.avatar || null,
+        lastSeenAt: user.lastSeenAt || Date.now()
       });
     });
 
@@ -193,7 +212,8 @@ io.on('connection', (socket) => {
       forceMuted: false,
       status: 'online',
       handRaised: false,
-      avatar: validAvatar
+      avatar: validAvatar,
+      lastSeenAt: Date.now()
     });
 
     socket.emit('room-joined', {
@@ -209,7 +229,9 @@ io.on('connection', (socket) => {
       polls: room.polls, // Send active polls
       pinned: room.pinned, // Send pinned messages
       // Ongoing screen shares, if any — strip the server-only watchers Set
-      screenShares: Object.values(room.screenShares || {}).map(({ socketId, name, streamId, paused }) => ({ socketId, name, streamId, paused: !!paused }))
+      screenShares: Object.values(room.screenShares || {}).map(({ socketId, name, streamId, paused }) => ({ socketId, name, streamId, paused: !!paused })),
+      inviteToken: room.inviteToken,
+      inviteExpiresAt: room.inviteExpiresAt || null
     });
 
     socket.to(roomId).emit('peer-joined', {
@@ -220,6 +242,7 @@ io.on('connection', (socket) => {
       isCreator: socket.id === room.creator,
       isModerator: room.moderators.includes(userName),
       status: 'online',
+      lastSeenAt: Date.now(),
       handRaised: false,
       avatar: validAvatar
     });
@@ -506,6 +529,15 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('typing-stop', { socketId: socket.id });
   });
 
+  // Read receipts — ephemeral, like status/handRaised (not persisted to disk)
+  socket.on('chat-seen', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    const user = room?.users.get(socket.id);
+    if (!user) return;
+    user.lastSeenAt = Date.now();
+    socket.to(roomId).emit('read-receipt-updated', { socketId: socket.id, lastSeenAt: user.lastSeenAt });
+  });
+
   // User Status & Hand Raise
   socket.on('update-status', ({ roomId, status }) => {
     const room = rooms.get(roomId);
@@ -532,6 +564,16 @@ io.on('connection', (socket) => {
   });
 
   // 🛡️ Admin & Moderation Controls (Creator Only)
+  // Creator-only: regenerate the invite token and set/clear an expiry window
+  socket.on('set-invite-expiry', ({ roomId, durationMs }) => {
+    const room = rooms.get(roomId);
+    if (!room || room.creator !== socket.id) return;
+    room.inviteToken = generateInviteToken();
+    room.inviteExpiresAt = durationMs ? Date.now() + durationMs : null;
+    io.to(roomId).emit('invite-updated', { inviteToken: room.inviteToken, inviteExpiresAt: room.inviteExpiresAt });
+    saveRoomsToDisk();
+  });
+
   socket.on('toggle-lock', ({ roomId, locked }) => {
     const room = rooms.get(roomId);
     if (!room) return;

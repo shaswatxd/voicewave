@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, globalShortcut, desktopCapturer, systemPreferences, shell } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, globalShortcut, desktopCapturer, systemPreferences, shell, Notification } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
@@ -23,10 +23,14 @@ let inRoom = false;
 
 const SERVER_URL = 'https://voicewave-7ozn.onrender.com';
 // The free-tier host spins down after ~15min idle and can take 30-90s to
-// cold-start — a flat 3-retry/3s budget (~9s) gives up long before that.
-// Backed-off delays give a realistic ~45s runway instead.
-const MAX_RETRIES = 6;
-const RETRY_DELAYS = [2000, 3000, 5000, 8000, 12000, 15000];
+// cold-start (occasionally longer under load). The old 6-retry/~45s budget
+// gave up before a slow cold-start finished, bounced to the error screen,
+// and the user's own "Try Again" click restarted the whole short cycle —
+// felt like an infinite loop that never actually connects. This budget
+// (9 retries, ~150s of backoff alone, more with each attempt's own network
+// time) comfortably outlasts the realistic worst case.
+const MAX_RETRIES = 9;
+const RETRY_DELAYS = [2000, 3000, 5000, 8000, 12000, 15000, 20000, 25000, 30000];
 let currentLoadIsRetrying = false;
 
 // ── Loading screen HTML ──
@@ -151,6 +155,11 @@ function loadWithRetry(win, url, attempt = 1) {
       try { document.getElementById('status').textContent = 'Server is waking up — this can take up to a minute…'; } catch(e) {}
     `).catch(() => {});
   }, 6000);
+  const watchdogLong = setTimeout(() => {
+    win.webContents.executeJavaScript(`
+      try { document.getElementById('status').textContent = 'Still waking up — free-tier cold starts can take up to 2 minutes…'; } catch(e) {}
+    `).catch(() => {});
+  }, 35000);
 
   win.loadURL(url).then(() => {
     currentLoadIsRetrying = false;
@@ -167,7 +176,7 @@ function loadWithRetry(win, url, attempt = 1) {
       currentLoadIsRetrying = false;
       win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(getErrorHTML(err.message || 'Server unreachable'))}`);
     }
-  }).finally(() => clearTimeout(watchdog));
+  }).finally(() => { clearTimeout(watchdog); clearTimeout(watchdogLong); });
 }
 
 function createWindow() {
@@ -214,6 +223,18 @@ function createWindow() {
     // of both handlers racing to navigate and flickering error→loading→error.
     if (currentLoadIsRetrying) return;
     mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(getErrorHTML(`${errorDescription} (code: ${errorCode})`))}`);
+  });
+
+  // The error page's "Try Again" button does a plain navigation to the app
+  // URL — intercept it and route through loadWithRetry instead of a single
+  // bare attempt, so a manual retry gets the same backoff/runway as the
+  // initial launch rather than bouncing straight back to the error page.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url === `${SERVER_URL}/app`) {
+      event.preventDefault();
+      mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(getLoadingHTML())}`);
+      loadWithRetry(mainWindow, url);
+    }
   });
 
   // Handle certificate errors (common on corporate networks)
@@ -422,6 +443,16 @@ ipcMain.handle('get-screen-sources', async () => {
 
 ipcMain.on('select-screen-source', (event, payload) => {
   pendingScreenShare = payload; // { sourceId, withAudio }
+});
+
+// OS-level notification (renderer stays informed even when minimized to tray)
+ipcMain.on('show-notification', (event, { title, body }) => {
+  if (!Notification.isSupported()) return;
+  const n = new Notification({ title, body, icon: path.join(__dirname, 'assets', 'icon.png') });
+  n.on('click', () => {
+    if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
+  });
+  n.show();
 });
 
 // Windows mic privacy status — lets the renderer show a helpful hint

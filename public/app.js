@@ -256,6 +256,21 @@
   let isRoomLocked = false;
   let qualityStatsInterval = null;
 
+  // ── Desktop/browser notifications ──
+  let desktopNotificationsEnabled = localStorage.getItem('vw_desktop_notifications') === 'true';
+
+  // ── Read receipts ──
+  let lastOwnMsgId = null;
+  let lastSeenEmitTimeout = null;
+
+  // ── Slash commands ──
+  let pendingActionMessage = false;
+
+  // ── Invite link expiry ──
+  let currentInviteToken = null;
+  let currentInviteExpiresAt = null;
+  let pendingInviteToken = null; // captured from a shared invite link's ?inv= param
+
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
 
@@ -289,6 +304,19 @@
         el.addEventListener('animationend', () => el.remove());
       }
     }, duration);
+  }
+
+  // Desktop app gets native OS notifications (fires even minimized to tray);
+  // browser gets the standard Web Notification API, gated on permission.
+  function notifyUser(title, body) {
+    if (!desktopNotificationsEnabled) return;
+    if (window.electronAPI && window.electronAPI.isElectron) {
+      window.electronAPI.notify(title, body);
+      return;
+    }
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/icon-192.png' });
+    }
   }
 
   function switchScreen(screen) {
@@ -1116,30 +1144,6 @@
     }
   }
 
-  // Browser / PWA sharing — the browser shows its own source picker
-  async function startWebScreenShare() {
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: { ideal: shareFps, max: 60 } },
-        audio: true
-      });
-      screenStream = stream;
-      const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) {
-        try { videoTrack.contentHint = shareFps >= 60 ? 'motion' : 'detail'; } catch (e) {}
-        videoTrack.onended = () => stopScreenShare();
-      }
-      // Announce first so viewers learn the stream id before tracks arrive
-      socket.emit('screen-share-start', { roomId, streamId: stream.id });
-    } catch (err) {
-      console.error('[VoiceWave] web screen share error:', err);
-      if (err && err.name !== 'NotAllowedError') {
-        toast('Could not start screen share: ' + (err.message || err.name), 'error');
-      }
-      cleanupScreenStream();
-    }
-  }
-
   function switchScreenSource() {
     if (!isScreenSharing) return;
     openScreenPicker(true);
@@ -1170,28 +1174,10 @@
     }
   }
 
-  // Browser path — no custom picker, getDisplayMedia shows the browser's own UI
-  async function switchWebScreenSource() {
-    if (!isScreenSharing || !screenStream) return;
-    const withAudio = screenStream.getAudioTracks().length > 0;
-    try {
-      const newStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: { ideal: shareFps, max: 60 } },
-        audio: withAudio
-      });
-      await applySourceSwitch(newStream);
-    } catch (err) {
-      console.error('[VoiceWave] web screen source switch error:', err);
-      if (err && err.name !== 'NotAllowedError') {
-        toast('Could not switch source: ' + (err.message || err.name), 'error');
-      }
-    }
-  }
-
-  // Shared by both switch paths: swap the video (and audio, if applicable)
-  // tracks into every existing sender via replaceTrack() — same m-line, no
-  // renegotiation, no new ontrack on receivers, so the switch is visually
-  // transparent to viewers the instant it resolves.
+  // Swaps the video (and audio, if applicable) tracks into every existing
+  // sender via replaceTrack() — same m-line, no renegotiation, no new
+  // ontrack on receivers, so the switch is visually transparent to viewers
+  // the instant it resolves.
   async function applySourceSwitch(newStream) {
     const oldVideoTrack = screenStream.getVideoTracks()[0];
     const oldAudioTrack = screenStream.getAudioTracks()[0];
@@ -1358,7 +1344,7 @@
     });
 
     if (shares.length === 0) {
-      stage.classList.remove('active');
+      stage.classList.remove('active', 'picker-compact');
       room.classList.remove('has-stage');
       const video = $('#stage-video');
       video.srcObject = null;
@@ -1405,8 +1391,13 @@
       if (volWrap) volWrap.style.display = 'none';
       clearConnectingWaitTimer();
       renderStageThumbs(shares);
+      // Mobile: don't let the "pick a stream" prompt eat the whole viewport
+      // like an opened share would — collapse it to a slim tap-to-watch
+      // strip (header + thumbnails only) until the user actually taps one.
+      stage.classList.toggle('picker-compact', isMobileDevice);
       return;
     }
+    stage.classList.remove('picker-compact');
     $('#stage-waiting').classList.remove('picker-mode');
 
     const share = screenShares[focusedShareId];
@@ -2392,7 +2383,12 @@
       // automatically (onnegotiationneeded) — no manual offer step needed.
       for (const p of data.peers) {
         createPeerConnection(p.socketId, p.name);
+        if (peers[p.socketId]) peers[p.socketId].lastSeenAt = p.lastSeenAt || Date.now();
       }
+
+      currentInviteToken = data.inviteToken || null;
+      currentInviteExpiresAt = data.inviteExpiresAt || null;
+      updateInviteOptionsButton();
 
       // Resume ongoing screen shares (people were already live)
       screenShares = {};
@@ -2447,9 +2443,14 @@
         peers[data.socketId].avatar = data.avatar || null;
         peers[data.socketId].status = data.status || 'online';
         peers[data.socketId].isModerator = data.isModerator || false;
+        peers[data.socketId].lastSeenAt = data.lastSeenAt || Date.now();
       }
       addPeerToGrid(data.socketId, data.name, data.muted, data.isCreator, data.avatar, data.forceMuted, data.status, data.handRaised, data.isModerator);
       toast(`${data.name} joined`, 'info');
+      // Desktop-only extra: OS notification for joins while minimized — browser stays mention-only
+      if (window.electronAPI && window.electronAPI.isElectron && document.hidden) {
+        notifyUser(`${data.name} joined`, roomId);
+      }
       if (localStream) {
         await addStreamToPeers();
       }
@@ -2494,6 +2495,7 @@
       window._iAmCreator = isCreator;
       toast(isCreator ? 'You are now the room creator' : 'New creator assigned', 'info');
       updateRoomLockButton();
+      updateInviteOptionsButton();
       updateRoomPermissionsInputs();
       renderUserGrid(Object.entries(peers).map(([id, p]) => ({
         socketId: id, name: p.name, muted: !!peerForceMuted[id], isCreator: id === data.socketId, avatar: p.avatar, status: p.status, isModerator: p.isModerator
@@ -2552,6 +2554,27 @@
       updateParticipantsDropdown();
     });
 
+    socket.on('read-receipt-updated', (data) => {
+      if (peers[data.socketId]) peers[data.socketId].lastSeenAt = data.lastSeenAt;
+      updateSeenLabel();
+    });
+
+    socket.on('invite-updated', (data) => {
+      currentInviteToken = data.inviteToken;
+      currentInviteExpiresAt = data.inviteExpiresAt;
+      if (inviteRegenerateRequested) {
+        inviteRegenerateRequested = false;
+        copyInviteLink();
+        toast('Invite link regenerated & copied', 'success');
+        $('#invite-options-dropdown')?.classList.remove('open');
+      }
+    });
+
+    socket.on('invite-expired', () => {
+      dismissWithPendingClear();
+      toast('This invite link has expired — ask the host for a new one', 'error');
+    });
+
     socket.on('peer-hand-raised', (data) => {
       UI_SOUNDS.play('hand');
       const card = $(`[data-socket="${data.socketId}"]`);
@@ -2586,6 +2609,7 @@
       }
       if (mentionsMe && (!chatOpen || document.hidden)) {
         toast(`${data.name} mentioned you`, 'info');
+        if (document.hidden) notifyUser(`${data.name} mentioned you`, data.text);
       }
     });
 
@@ -2856,6 +2880,7 @@
     const el = document.createElement('div');
     el.className = `chat-msg${isOwn ? ' own' : ''}${data.isWhisper ? ' whisper' : ''}${isMentioned ? ' mentioned' : ''}`;
     el.dataset.msgid = data.msgId;
+    el.dataset.timestamp = data.timestamp || Date.now();
     el.dataset.rawText = data.text || ''; // pre-markdown source, so edit/reply don't operate on rendered (formatted) text
 
     let senderAvatar = isOwn ? userAvatar : (peers[data.socketId]?.avatar || null);
@@ -2902,9 +2927,10 @@
     // Whisper note
     const whisperLabel = data.isWhisper ? `<span style="font-size:0.65rem; padding:1px 4px; background:#eab308; color:#000; border-radius:4px; margin-left:4px;">Whisper to @${escapeHtml(data.toName)}</span>` : '';
 
-    el.innerHTML = `
-      ${replyContextHtml}
-      ${actionsHoverHtml}
+    // "/me" action messages render as a single italic line, Discord/IRC-style
+    const bodyHtml = data.isAction
+      ? `<div class="chat-msg-text chat-msg-action"><em>* ${escapeHtml(data.name)} ${formatMessageText(data.text)} *</em></div>`
+      : `
       <div class="chat-msg-header">
         <div style="display:flex;align-items:center;gap:4px;">
           ${avatarHtml}
@@ -2913,9 +2939,15 @@
         </div>
         <span class="chat-msg-time">${time}</span>
       </div>
-      <div class="chat-msg-text">${formatMessageText(data.text)}${data.edited ? ' <span class="chat-msg-edited-tag">(edited)</span>' : ''}</div>
+      <div class="chat-msg-text">${formatMessageText(data.text)}${data.edited ? ' <span class="chat-msg-edited-tag">(edited)</span>' : ''}</div>`;
+
+    el.innerHTML = `
+      ${replyContextHtml}
+      ${actionsHoverHtml}
+      ${bodyHtml}
       ${fileHtml}
       <div class="msg-reactions"></div>
+      ${isOwn ? '<div class="chat-msg-seen" style="display:none;"></div>' : ''}
     `;
 
     container.appendChild(el);
@@ -2931,6 +2963,35 @@
 
     // Render reactions if payload has them
     if (data.reactions) renderMessageReactions(el, data.reactions);
+
+    if (isOwn) {
+      lastOwnMsgId = data.msgId;
+      updateSeenLabel();
+    }
+    if (chatOpen && document.hasFocus()) scheduleChatSeenEmit();
+  }
+
+  // Shows "Seen" under the sender's own last message once any other peer's
+  // last-seen timestamp catches up to it — WhatsApp-style, last bubble only
+  // (not per-message) to keep the chat from getting visually noisy.
+  function updateSeenLabel() {
+    if (!lastOwnMsgId) return;
+    const el = $(`[data-msgid="${lastOwnMsgId}"]`);
+    const label = el?.querySelector('.chat-msg-seen');
+    if (!label) return;
+    const msgTimestamp = parseInt(el.dataset.timestamp || '0', 10);
+    const seen = Object.values(peers).some(p => (p.lastSeenAt || 0) >= msgTimestamp);
+    label.textContent = seen ? 'Seen' : '';
+    label.style.display = seen ? 'block' : 'none';
+  }
+
+  // Debounced so a burst of incoming messages doesn't spam the server
+  function scheduleChatSeenEmit() {
+    if (!socket || !roomId) return;
+    clearTimeout(lastSeenEmitTimeout);
+    lastSeenEmitTimeout = setTimeout(() => {
+      socket.emit('chat-seen', { roomId });
+    }, 1000);
   }
 
   // Turns a message's text into an inline input (Enter to save, Escape to
@@ -3098,6 +3159,7 @@
       updateChatBadge();
       $('#chat-input').focus();
       scrollChatToBottom(false);
+      scheduleChatSeenEmit();
     }
   }
 
@@ -3384,10 +3446,62 @@
     });
   }
 
+  // Chat commands — all client-side; /mute /unmute /kick just reuse the
+  // existing socket events, which are already permission-checked server-side
+  // (isCreator/isModerator), so the client-side isAdmin check here is only
+  // a UX guard, not real enforcement.
+  function runSlashCommand(raw) {
+    const spaceIdx = raw.indexOf(' ');
+    const cmd = (spaceIdx === -1 ? raw.slice(1) : raw.slice(1, spaceIdx)).toLowerCase();
+    const arg = spaceIdx === -1 ? '' : raw.slice(spaceIdx + 1).trim();
+    const input = $('#chat-input');
+    const isAdmin = isCreator || roomModerators.includes(window.userName);
+
+    switch (cmd) {
+      case 'shrug':
+        input.value = (arg ? arg + ' ' : '') + '¯\\_(ツ)_/¯';
+        return false; // fall through to normal send with the rewritten text
+      case 'me':
+        if (!arg) { toast('Usage: /me <action>', 'error'); return true; }
+        pendingActionMessage = true;
+        input.value = arg;
+        return false;
+      case 'clear':
+        $('#chat-messages').innerHTML = '';
+        toast('Chat cleared (only for you)', 'info');
+        return true;
+      case 'mute':
+      case 'unmute':
+      case 'kick': {
+        if (!isAdmin) { toast('Only the host or a moderator can do that', 'error'); return true; }
+        if (!arg) { toast(`Usage: /${cmd} <name>`, 'error'); return true; }
+        const match = Object.entries(peers).find(([, p]) => p.name?.toLowerCase() === arg.toLowerCase());
+        if (!match) { toast(`User "${arg}" not found`, 'error'); return true; }
+        const targetId = match[0];
+        if (cmd === 'kick') socket.emit('kick-user', { roomId, targetId });
+        else socket.emit(cmd === 'mute' ? 'force-mute' : 'force-unmute', { roomId, targetId });
+        toast(`${cmd === 'kick' ? 'Kicked' : cmd === 'mute' ? 'Muted' : 'Unmuted'} ${arg}`, 'success');
+        return true;
+      }
+      case 'help':
+        toast('Commands: /me /shrug /clear /mute /unmute /kick /help', 'info');
+        return true;
+      default:
+        toast(`Unknown command: /${cmd}`, 'error');
+        return true;
+    }
+  }
+
   function sendMessage() {
     const input = $('#chat-input');
-    const text = input.value.trim();
+    let text = input.value.trim();
     if (!text && !pendingFile) return;
+
+    if (text.startsWith('/') && !pendingFile) {
+      if (runSlashCommand(text)) { input.value = ''; return; }
+      text = input.value.trim();
+      if (!text) return;
+    }
 
     // Check chat permission
     if (!roomPermissions.allowChat && !isCreator && !roomModerators.includes(window.userName)) {
@@ -3403,6 +3517,11 @@
       timestamp: Date.now(),
       msgId
     };
+
+    if (pendingActionMessage) {
+      msgData.isAction = true;
+      pendingActionMessage = false;
+    }
 
     // Attach reply quote if active
     if (replyingTo) {
@@ -3446,7 +3565,16 @@
   function getInviteLink() {
     let link = `${window.location.origin}/app?room=${roomId}`;
     if (roomPassword) link += `&password=${encodeURIComponent(roomPassword)}`;
+    if (currentInviteToken) link += `&inv=${currentInviteToken}`;
     return link;
+  }
+
+  // Creator-only invite link controls (expiry + regenerate)
+  let inviteRegenerateRequested = false;
+
+  function updateInviteOptionsButton() {
+    const btn = $('#btn-invite-options');
+    if (btn) btn.style.display = isCreatorLocal() ? 'inline-flex' : 'none';
   }
 
   function copyInviteLink() {
@@ -3578,6 +3706,11 @@
       soundNotifyCheck.checked = soundNotifications;
     }
 
+    const desktopNotifyCheck = $('#setting-desktop-notifications');
+    if (desktopNotifyCheck) {
+      desktopNotifyCheck.checked = desktopNotificationsEnabled;
+    }
+
     const manualShareFocusCheck = $('#setting-manual-share-focus');
     if (manualShareFocusCheck) {
       manualShareFocusCheck.checked = manualShareFocus;
@@ -3690,19 +3823,19 @@
       }
     });
 
-    // ── SCREEN SHARE TRIGGERS (desktop app has a custom picker; desktop browsers use the native one) ──
-    // Mobile browsers (Android/iOS) don't have a reliable getDisplayMedia
-    // picker — some report the API as present but it fails or behaves
-    // inconsistently — so screen share is desktop-only, full stop.
+    // ── SCREEN SHARE TRIGGERS (desktop app only) ──
+    // Browser getDisplayMedia() screen-capture varies wildly across
+    // browsers/OSes (permission prompts, missing system-audio support,
+    // unreliable on mobile) — the desktop app's native picker is the only
+    // properly-tested path, so sharing (starting a share) is desktop-only.
+    // Browser users can still watch shares from desktop users just fine.
     const screenShareBtn = $('#btn-screen-share');
-    const canShareScreen = (window.electronAPI && window.electronAPI.isElectron) ||
-      (!isMobileDevice && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+    const canShareScreen = !!(window.electronAPI && window.electronAPI.isElectron);
     if (screenShareBtn && canShareScreen) {
       screenShareBtn.style.display = 'flex';
       screenShareBtn.addEventListener('click', () => {
         if (isScreenSharing) stopScreenShare();
-        else if (window.electronAPI && window.electronAPI.isElectron) openScreenPicker();
-        else startWebScreenShare();
+        else openScreenPicker();
       });
     }
 
@@ -3728,10 +3861,7 @@
 
     $('#stage-stop')?.addEventListener('click', () => stopScreenShare());
     $('#stage-pause')?.addEventListener('click', () => togglePauseScreenShare());
-    $('#stage-switch-source')?.addEventListener('click', () => {
-      if (window.electronAPI && window.electronAPI.isElectron) switchScreenSource();
-      else switchWebScreenSource();
-    });
+    $('#stage-switch-source')?.addEventListener('click', switchScreenSource);
     $('#stage-fullscreen')?.addEventListener('click', () => {
       const wrap = $('#stage-video-wrap');
       if (document.fullscreenElement) {
@@ -3999,21 +4129,21 @@
       beginConnecting();
 
       if (!socket || !socket.connected) {
-        window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: true, password, avatar: getAvatarPayload() };
+        window._pendingJoin = { roomId: code, userName: name, muted: false, joinOnly: true, password, avatar: getAvatarPayload(), inviteToken: pendingInviteToken };
         connectSocket();
       } else {
-        socket.emit('join-room', { roomId: code, userName: name, muted: false, joinOnly: true, password, avatar: getAvatarPayload() });
+        socket.emit('join-room', { roomId: code, userName: name, muted: false, joinOnly: true, password, avatar: getAvatarPayload(), inviteToken: pendingInviteToken });
       }
     });
 
     $('#modal-submit').addEventListener('click', () => {
       const password = $('#modal-password').value;
       let code = $('#join-code').value.trim().toUpperCase().replace(/0/g, 'O').replace(/1/g, 'I');
-      window._pendingJoin = { roomId: code, userName: window.userName, muted: false, joinOnly: true, password, avatar: getAvatarPayload() };
+      window._pendingJoin = { roomId: code, userName: window.userName, muted: false, joinOnly: true, password, avatar: getAvatarPayload(), inviteToken: pendingInviteToken };
       $('#password-modal').classList.remove('open');
       beginConnecting();
       if (socket && socket.connected) {
-        socket.emit('join-room', { roomId: code, userName: window.userName, muted: false, joinOnly: true, password, avatar: getAvatarPayload() });
+        socket.emit('join-room', { roomId: code, userName: window.userName, muted: false, joinOnly: true, password, avatar: getAvatarPayload(), inviteToken: pendingInviteToken });
       } else {
         // Socket dropped while the password modal was open — reconnect
         // instead of leaving the overlay spinning with no attempt in flight.
@@ -4027,6 +4157,17 @@
 
     $('#btn-invite').addEventListener('click', copyInviteLink);
 
+    $('#btn-invite-options')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      $('#invite-options-dropdown')?.classList.toggle('open');
+    });
+
+    $('#btn-regenerate-invite')?.addEventListener('click', () => {
+      const durationMs = parseInt($('#invite-expiry-select')?.value || '0', 10);
+      inviteRegenerateRequested = true;
+      socket.emit('set-invite-expiry', { roomId, durationMs });
+    });
+
     $('#btn-participants').addEventListener('click', (e) => {
       e.stopPropagation();
       const dd = $('#participants-dropdown');
@@ -4038,6 +4179,10 @@
       const dd = $('#participants-dropdown');
       if (dd && !e.target.closest('#participants-dropdown') && !e.target.closest('#btn-participants')) {
         dd.classList.remove('open');
+      }
+      const inviteDd = $('#invite-options-dropdown');
+      if (inviteDd && !e.target.closest('#invite-options-dropdown') && !e.target.closest('#btn-invite-options')) {
+        inviteDd.classList.remove('open');
       }
     });
 
@@ -4171,6 +4316,24 @@
     $('#setting-sound-notifications')?.addEventListener('change', (e) => {
       soundNotifications = e.target.checked;
       localStorage.setItem('vw_sound_notifications', soundNotifications);
+    });
+
+    $('#setting-desktop-notifications')?.addEventListener('change', (e) => {
+      const enabling = e.target.checked;
+      const isElectron = !!(window.electronAPI && window.electronAPI.isElectron);
+      if (enabling && !isElectron && 'Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().then((perm) => {
+          if (perm !== 'granted') {
+            e.target.checked = false;
+            toast('Notification permission denied', 'error');
+          }
+          desktopNotificationsEnabled = e.target.checked;
+          localStorage.setItem('vw_desktop_notifications', desktopNotificationsEnabled);
+        });
+        return;
+      }
+      desktopNotificationsEnabled = enabling;
+      localStorage.setItem('vw_desktop_notifications', desktopNotificationsEnabled);
     });
 
     $('#setting-manual-share-focus')?.addEventListener('change', (e) => {
@@ -4424,6 +4587,7 @@
     const urlParams = new URLSearchParams(window.location.search);
     let roomParam = urlParams.get('room');
     const passParam = urlParams.get('password');
+    pendingInviteToken = urlParams.get('inv') || null;
     if (roomParam) {
       roomParam = roomParam.trim().toUpperCase().replace(/0/g, 'O').replace(/1/g, 'I');
       $('#join-code').value = roomParam;

@@ -18,5 +18,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onTrayMuteToggle: (callback) => { ipcRenderer.removeAllListeners('tray-mute-toggle'); ipcRenderer.on('tray-mute-toggle', callback); },
   onTrayDeafenToggle: (callback) => { ipcRenderer.removeAllListeners('tray-deafen-toggle'); ipcRenderer.on('tray-deafen-toggle', callback); },
   onTrayLeaveRoom: (callback) => { ipcRenderer.removeAllListeners('tray-leave-room'); ipcRenderer.on('tray-leave-room', callback); },
+  notify: (title, body) => ipcRenderer.send('show-notification', { title, body }),
   isElectron: true
 });
