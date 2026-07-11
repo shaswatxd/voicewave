@@ -322,7 +322,7 @@ function createTray() {
 
   tray.setContextMenu(contextMenu);
 
-  tray.on('double-click', () => {
+  tray.on('click', () => {
     if (mainWindow) {
       mainWindow.show();
       mainWindow.focus();
