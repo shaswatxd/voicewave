@@ -166,6 +166,8 @@
   let mediaRecorder = null;
   let recordedChunks = [];
   let isRecording = false;
+  let recordingTimer = null;
+  let recordingStartTime = null;
   let speakingTimeout = null;
   let pollInterval = null;
   let pendingFile = null;
@@ -2108,9 +2110,15 @@
     const bufferLength = analyserNode.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
 
+    if (visualizerDrawLoop) {
+      cancelAnimationFrame(visualizerDrawLoop);
+      visualizerDrawLoop = null;
+    }
+
     function draw() {
-      if (!roomId) {
+      if (!$('#settings-modal').classList.contains('open')) {
         cancelAnimationFrame(visualizerDrawLoop);
+        visualizerDrawLoop = null;
         return;
       }
       visualizerDrawLoop = requestAnimationFrame(draw);
@@ -3193,8 +3201,20 @@
     };
     mediaRecorder.start();
     isRecording = true;
+    recordingStartTime = Date.now();
     $('#btn-record').classList.add('active');
-    $('#record-label').textContent = 'Stop';
+
+    // Live timer tick
+    const updateTimer = () => {
+      const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+      const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+      const ss = String(elapsed % 60).padStart(2, '0');
+      const label = $('#record-label');
+      if (label) label.textContent = `⏺ ${mm}:${ss}`;
+    };
+    updateTimer();
+    recordingTimer = setInterval(updateTimer, 1000);
+
     toast('Recording started', 'info');
   }
 
@@ -3202,6 +3222,8 @@
     if (mediaRecorder && isRecording) {
       mediaRecorder.stop();
       isRecording = false;
+      if (recordingTimer) { clearInterval(recordingTimer); recordingTimer = null; }
+      recordingStartTime = null;
       $('#btn-record').classList.remove('active');
       $('#record-label').textContent = 'Record';
       toast('Recording saved', 'success');
@@ -3221,6 +3243,7 @@
     if (typingTimeout) clearTimeout(typingTimeout);
     if (speakingTimeout) clearTimeout(speakingTimeout);
     if (qualityStatsInterval) clearInterval(qualityStatsInterval);
+    if (recordingTimer) { clearInterval(recordingTimer); recordingTimer = null; }
     if (mediaRecorder && isRecording) mediaRecorder.stop();
 
     cancelAnimationFrame(visualizerDrawLoop);
@@ -4223,15 +4246,54 @@
       else startRecording();
     });
 
-    $('#btn-settings').addEventListener('click', () => {
+    const closeSettings = () => {
+      $('#settings-modal').classList.remove('open');
+      if (visualizerDrawLoop) {
+        cancelAnimationFrame(visualizerDrawLoop);
+        visualizerDrawLoop = null;
+      }
+      if (!roomId) {
+        teardownMicPipeline();
+        if (localStream) {
+          localStream.getTracks().forEach(t => t.stop());
+          localStream = null;
+        }
+        micAcquirePromise = null;
+        if (audioContext) {
+          try { audioContext.close(); } catch (e) {}
+          audioContext = null;
+        }
+        audioWorkletModulePromise = null;
+      }
+    };
+
+    $('#btn-settings').addEventListener('click', async () => {
       $('#settings-modal').classList.add('open');
+      if (!roomId) {
+        // In lobby: acquire mic first (unlocks real device labels), then enumerate
+        const gotMic = await getMediaStream(undefined);
+        // User may have closed settings while permission prompt was showing
+        if (!$('#settings-modal').classList.contains('open')) {
+          if (gotMic && localStream) {
+            localStream.getTracks().forEach(t => t.stop());
+            localStream = null;
+          }
+          return;
+        }
+        // Now enumerate with labels available
+        await enumerateDevices();
+        if (gotMic && localStream) {
+          await setupAudioProcessing();
+        }
+      } else {
+        // In room: just refresh device list and restart visualizer
+        await enumerateDevices();
+        startVisualizer();
+      }
     });
-    $('#settings-close').addEventListener('click', () => {
-      $('#settings-modal').classList.remove('open');
-    });
-    $('#settings-done')?.addEventListener('click', () => {
-      $('#settings-modal').classList.remove('open');
-    });
+
+    $('#settings-close').addEventListener('click', closeSettings);
+    $('#settings-done')?.addEventListener('click', closeSettings);
 
     $('#master-volume').addEventListener('input', (e) => {
       if (masterGainNode) masterGainNode.gain.value = e.target.value / 100;
@@ -4353,7 +4415,13 @@
 
     $$('.modal').forEach(modal => {
       modal.addEventListener('click', (e) => {
-        if (e.target === modal) modal.classList.remove('open');
+        if (e.target === modal) {
+          if (modal.id === 'settings-modal') {
+            closeSettings();
+          } else {
+            modal.classList.remove('open');
+          }
+        }
       });
     });
 
