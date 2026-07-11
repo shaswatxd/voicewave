@@ -1,4 +1,4 @@
-const CACHE_NAME = 'voicewave-v1.0.90';
+const CACHE_NAME = 'voicewave-v1.0.91';
 const ASSETS = [
   '/',
   '/app',

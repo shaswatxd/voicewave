@@ -266,9 +266,8 @@
   // ── Slash commands ──
   let pendingActionMessage = false;
 
-  // ── Invite link expiry ──
+  // ── Invite link ──
   let currentInviteToken = null;
-  let currentInviteExpiresAt = null;
   let pendingInviteToken = null; // captured from a shared invite link's ?inv= param
 
   const $ = (sel) => document.querySelector(sel);
@@ -2337,8 +2336,6 @@
       }
 
       currentInviteToken = data.inviteToken || null;
-      currentInviteExpiresAt = data.inviteExpiresAt || null;
-      updateInviteOptionsButton();
 
       // Resume ongoing screen shares (people were already live)
       screenShares = {};
@@ -2444,7 +2441,6 @@
       window._iAmCreator = isCreator;
       toast(isCreator ? 'You are now the room creator' : 'New creator assigned', 'info');
       updateRoomLockButton();
-      updateInviteOptionsButton();
       updateRoomPermissionsInputs();
       renderUserGrid(Object.entries(peers).map(([id, p]) => ({
         socketId: id, name: p.name, muted: !!peerForceMuted[id], isCreator: id === data.socketId, avatar: p.avatar, status: p.status, isModerator: p.isModerator
@@ -2506,17 +2502,6 @@
     socket.on('read-receipt-updated', (data) => {
       if (peers[data.socketId]) peers[data.socketId].lastSeenAt = data.lastSeenAt;
       updateSeenLabel();
-    });
-
-    socket.on('invite-updated', (data) => {
-      currentInviteToken = data.inviteToken;
-      currentInviteExpiresAt = data.inviteExpiresAt;
-      if (inviteRegenerateRequested) {
-        inviteRegenerateRequested = false;
-        copyInviteLink();
-        toast('Invite link regenerated & copied', 'success');
-        $('#invite-options-dropdown')?.classList.remove('open');
-      }
     });
 
     socket.on('invite-expired', () => {
@@ -3515,14 +3500,6 @@
     return link;
   }
 
-  // Creator-only invite link controls (expiry + regenerate)
-  let inviteRegenerateRequested = false;
-
-  function updateInviteOptionsButton() {
-    const btn = $('#btn-invite-options');
-    if (btn) btn.style.display = isCreatorLocal() ? 'inline-flex' : 'none';
-  }
-
   function copyInviteLink() {
     const link = getInviteLink();
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -4127,17 +4104,6 @@
 
     $('#btn-invite').addEventListener('click', copyInviteLink);
 
-    $('#btn-invite-options')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      $('#invite-options-dropdown')?.classList.toggle('open');
-    });
-
-    $('#btn-regenerate-invite')?.addEventListener('click', () => {
-      const durationMs = parseInt($('#invite-expiry-select')?.value || '0', 10);
-      inviteRegenerateRequested = true;
-      socket.emit('set-invite-expiry', { roomId, durationMs });
-    });
-
     $('#btn-participants').addEventListener('click', (e) => {
       e.stopPropagation();
       const dd = $('#participants-dropdown');
@@ -4149,10 +4115,6 @@
       const dd = $('#participants-dropdown');
       if (dd && !e.target.closest('#participants-dropdown') && !e.target.closest('#btn-participants')) {
         dd.classList.remove('open');
-      }
-      const inviteDd = $('#invite-options-dropdown');
-      if (inviteDd && !e.target.closest('#invite-options-dropdown') && !e.target.closest('#btn-invite-options')) {
-        inviteDd.classList.remove('open');
       }
     });
 

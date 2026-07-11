@@ -534,16 +534,6 @@ io.on('connection', (socket) => {
   });
 
   // 🛡️ Admin & Moderation Controls (Creator Only)
-  // Creator-only: regenerate the invite token and set/clear an expiry window
-  socket.on('set-invite-expiry', ({ roomId, durationMs }) => {
-    const room = rooms.get(roomId);
-    if (!room || room.creator !== socket.id) return;
-    room.inviteToken = generateInviteToken();
-    room.inviteExpiresAt = durationMs ? Date.now() + durationMs : null;
-    io.to(roomId).emit('invite-updated', { inviteToken: room.inviteToken, inviteExpiresAt: room.inviteExpiresAt });
-    saveRoomsToDisk();
-  });
-
   socket.on('toggle-lock', ({ roomId, locked }) => {
     const room = rooms.get(roomId);
     if (!room) return;

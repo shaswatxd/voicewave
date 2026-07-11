@@ -929,11 +929,11 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
   .control-label { display: none; }
   .control-btn { padding: 10px 12px; min-width: 44px; min-height: 44px; }
   .room-header { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
-  .room-actions { gap: 6px; }
+  .room-actions { gap: 6px; order: 3; flex-basis: 100%; justify-content: center; }
   .btn-icon { width: 40px; height: 40px; }
-  .room-info { flex: 1; min-width: 0; }
-  .room-id-label { font-size: 0.75rem; }
-  .room-timer { font-size: 0.78rem; }
+  .room-info { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+  .room-id-label { font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+  .room-timer { font-size: 0.78rem; flex-shrink: 0; white-space: nowrap; }
   .lobby-header h1 { font-size: 1.8rem; }
   .lobby-header p { font-size: 0.82rem; }
   .lobby-container::before { width: 350px; height: 350px; top: -120px; }
@@ -1183,12 +1183,6 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
   .titlebar-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
   .titlebar-close:hover { background: var(--danger); color: #fff; }
 
-  .room-header { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: var(--bg-panel); border-bottom: 1px solid var(--border-light); z-index: 10; }
-  .room-info { display: flex; align-items: center; gap: 8px; }
-  .room-id-label { font-size: 0.82rem; color: var(--muted); }
-  .room-code { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--cyan); font-size: 0.85rem; }
-  .room-timer { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--muted); }
-  .room-actions { display: flex; align-items: center; gap: 8px; }
   .btn-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: var(--glass); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 1rem; transition: all 0.2s; color: var(--text); position: relative; }
   .btn-icon:hover { border-color: var(--cyan); background: rgba(34,211,238,0.08); }
   .btn-icon .badge { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; background: var(--danger); color: #fff; border-radius: 8px; font-size: 0.6rem; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
@@ -2186,9 +2180,6 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
 .chat-msg-edited-tag { font-size: 0.66rem; color: var(--muted); font-style: italic; }
 .chat-msg-action { color: var(--muted); }
 .chat-msg-seen { font-size: 0.65rem; color: var(--muted); margin-top: 2px; text-align: right; }
-
-/* ── INVITE OPTIONS DROPDOWN (creator-only, reuses participants-dropdown base) ── */
-.invite-options-dropdown { width: 220px; }
 
 /* ── LIVE STREAM QUALITY DROPDOWN (sharer-only, reuses participants-dropdown base) ── */
 .stage-quality-dropdown { width: 200px; right: auto; left: 0; }
