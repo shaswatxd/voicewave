@@ -13,7 +13,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.95">
+<link rel="stylesheet" href="/app.css?v=1.0.96">
 <!-- Consolidated Styles moved to app.css -->
 </head>
 <body>
@@ -471,10 +471,6 @@
         <label>Output Device</label>
         <select id="output-device"></select>
       </div>
-      <div class="setting-item setting-span-2">
-        <label>Mic Test</label>
-        <canvas id="settings-audio-visualizer" style="width:100%; height:40px; background:rgba(0,0,0,0.25); border-radius:8px; display:block;"></canvas>
-      </div>
       <div class="setting-item setting-toggle">
         <label class="toggle-label">
           <input type="checkbox" id="setting-ptt-enabled">
@@ -752,7 +748,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.95';
+  window.APP_VERSION = '1.0.96';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -790,6 +786,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.95"></script>
+<script src="/app.js?v=1.0.96"></script>
 </body>
 </html>

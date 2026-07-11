@@ -133,11 +133,6 @@
   let noiseGateNode = null;
   let micDestinationNode = null;
   let processedMicTrack = null;
-  // Independent, always-enabled tap for the Settings "Mic Test" visualizer —
-  // separate from the outgoing chain so mute/PTT (which disable the real
-  // localStream track) don't make the test bars look dead/broken.
-  let micTestSourceNode = null;
-  let micTestTrack = null;
   let usingWorkletGate = false;
   let audioWorkletModulePromise = null;
   let fallbackGateAnalyser = null;
@@ -249,9 +244,6 @@
   let micAcquirePromise = null; // pre-acquired mic promise (started on join click)
   let remoteAnalysers = {};     // socketId -> AnalyserNode for remote speaking detection
 
-  let visualizerCanvas = null;
-  let visualizerCtx = null;
-  let visualizerDrawLoop = null;
   let pinnedMessages = [];
   let activePolls = [];
   let roomPermissions = { allowChat: true, allowMic: true };
@@ -559,7 +551,10 @@
   // connection instead of after it — makes joining feel much faster.
   function preacquireMic() {
     if (localStream) return Promise.resolve(true);
-    if (!micAcquirePromise) micAcquirePromise = getMediaStream();
+    if (!micAcquirePromise) {
+      const deviceId = $('#input-device')?.value;
+      micAcquirePromise = getMediaStream(deviceId || undefined);
+    }
     return micAcquirePromise;
   }
 
@@ -598,18 +593,15 @@
 
   function teardownMicPipeline() {
     if (fallbackGateInterval) { clearInterval(fallbackGateInterval); fallbackGateInterval = null; }
-    [micSourceNode, micGainNode, analyserNode, noiseGateNode, fallbackGateAnalyser, micDestinationNode, micTestSourceNode].forEach(node => {
+    [micSourceNode, micGainNode, analyserNode, noiseGateNode, fallbackGateAnalyser, micDestinationNode].forEach(node => {
       if (node) { try { node.disconnect(); } catch (e) {} }
     });
     if (processedMicTrack) { try { processedMicTrack.stop(); } catch (e) {} }
-    if (micTestTrack) { try { micTestTrack.stop(); } catch (e) {} }
     micSourceNode = null;
     noiseGateNode = null;
     fallbackGateAnalyser = null;
     micDestinationNode = null;
     processedMicTrack = null;
-    micTestSourceNode = null;
-    micTestTrack = null;
   }
 
   async function createNoiseGateNode(ctx) {
@@ -680,16 +672,7 @@
     analyserNode.smoothingTimeConstant = 0.8;
 
     micSourceNode.connect(micGainNode);
-
-    // Mic Test tap: a cloned track has its own independent enabled state,
-    // so muting yourself (or idle PTT) doesn't silence the test visualizer.
-    const rawTrack = localStream.getAudioTracks()[0];
-    if (rawTrack) {
-      micTestTrack = rawTrack.clone();
-      micTestTrack.enabled = true;
-      micTestSourceNode = ctx.createMediaStreamSource(new MediaStream([micTestTrack]));
-      micTestSourceNode.connect(analyserNode);
-    }
+    micGainNode.connect(analyserNode);
 
     noiseGateNode = await createNoiseGateNode(ctx);
     micGainNode.connect(noiseGateNode);
@@ -704,8 +687,6 @@
       masterGainNode = ctx.createGain();
       masterGainNode.gain.value = $('#master-volume') ? ($('#master-volume').value / 100) : 1;
     }
-
-    startVisualizer();
   }
 
   // The track peers actually receive — the processed one when ready,
@@ -2098,52 +2079,6 @@
     }
   }
 
-  // ── CANVAS VISUALIZER FOR SETTINGS ──
-  function startVisualizer() {
-    if (!analyserNode) return;
-    visualizerCanvas = $('#settings-audio-visualizer');
-    if (!visualizerCanvas) return;
-    visualizerCtx = visualizerCanvas.getContext('2d');
-    visualizerCanvas.width = visualizerCanvas.offsetWidth || 300;
-    visualizerCanvas.height = 40;
-
-    const bufferLength = analyserNode.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-
-    if (visualizerDrawLoop) {
-      cancelAnimationFrame(visualizerDrawLoop);
-      visualizerDrawLoop = null;
-    }
-
-    function draw() {
-      if (!$('#settings-modal').classList.contains('open')) {
-        cancelAnimationFrame(visualizerDrawLoop);
-        visualizerDrawLoop = null;
-        return;
-      }
-      visualizerDrawLoop = requestAnimationFrame(draw);
-      analyserNode.getByteFrequencyData(dataArray);
-
-      const width = visualizerCanvas.width;
-      const height = visualizerCanvas.height;
-
-      visualizerCtx.fillStyle = 'rgba(6, 10, 18, 0.4)';
-      visualizerCtx.fillRect(0, 0, width, height);
-
-      const barWidth = (width / bufferLength) * 2.5;
-      let barHeight;
-      let x = 0;
-
-      for (let i = 0; i < bufferLength; i++) {
-        barHeight = (dataArray[i] / 255) * height * 0.95;
-        visualizerCtx.fillStyle = `rgb(${34 + (i * 2)}, ${211 - (i * 2)}, 238)`;
-        visualizerCtx.fillRect(x, height - barHeight, barWidth, barHeight);
-        x += barWidth + 1;
-      }
-    }
-    draw();
-  }
-
   // ── UPDATE LIGHT/DARK THEME ──
   function applyTheme(theme) {
     localTheme = theme;
@@ -3246,8 +3181,6 @@
     if (recordingTimer) { clearInterval(recordingTimer); recordingTimer = null; }
     if (mediaRecorder && isRecording) mediaRecorder.stop();
 
-    cancelAnimationFrame(visualizerDrawLoop);
-
     Object.values(peers).forEach(p => p.pc.close());
     peers = {};
     peerStreams = {};
@@ -4248,47 +4181,29 @@
 
     const closeSettings = () => {
       $('#settings-modal').classList.remove('open');
-      if (visualizerDrawLoop) {
-        cancelAnimationFrame(visualizerDrawLoop);
-        visualizerDrawLoop = null;
-      }
-      if (!roomId) {
-        teardownMicPipeline();
-        if (localStream) {
-          localStream.getTracks().forEach(t => t.stop());
-          localStream = null;
-        }
-        micAcquirePromise = null;
-        if (audioContext) {
-          try { audioContext.close(); } catch (e) {}
-          audioContext = null;
-        }
-        audioWorkletModulePromise = null;
-      }
     };
 
     $('#btn-settings').addEventListener('click', async () => {
       $('#settings-modal').classList.add('open');
       if (!roomId) {
-        // In lobby: acquire mic first (unlocks real device labels), then enumerate
-        const gotMic = await getMediaStream(undefined);
-        // User may have closed settings while permission prompt was showing
-        if (!$('#settings-modal').classList.contains('open')) {
-          if (gotMic && localStream) {
-            localStream.getTracks().forEach(t => t.stop());
-            localStream = null;
+        // In lobby: check if we need to request permission to see device labels
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const needsPermission = devices.some(d => d.kind === 'audioinput' && !d.label);
+          if (needsPermission) {
+            const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            await enumerateDevices();
+            tempStream.getTracks().forEach(t => t.stop());
+          } else {
+            await enumerateDevices();
           }
-          return;
-        }
-        // Now enumerate with labels available
-        await enumerateDevices();
-        if (gotMic && localStream) {
-          await setupAudioProcessing();
+        } catch (err) {
+          console.warn('Error enumerating/permission request in settings:', err);
+          await enumerateDevices();
         }
       } else {
-        // In room: just refresh device list and restart visualizer
+        // In room: just refresh device list
         await enumerateDevices();
-        startVisualizer();
       }
     });
 
@@ -4384,7 +4299,8 @@
     $('#input-device').addEventListener('change', async (e) => {
       const deviceId = e.target.value;
       if (!deviceId) return;
-      if (localStream) localStream.getTracks().forEach(t => t.stop());
+      if (!localStream) return;
+      localStream.getTracks().forEach(t => t.stop());
       const gotMic = await getMediaStream(deviceId);
       if (gotMic && localStream) {
         await setupAudioProcessing();
