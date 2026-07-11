@@ -431,17 +431,20 @@
     const img = $('#profile-avatar-img');
     const removeBtn = $('#btn-remove-avatar');
     const nameEl = $('#profile-display-name-input');
+    const colorGroup = $('#avatar-color-group');
 
     if (userAvatar) {
       img.src = userAvatar;
       img.style.display = 'block';
       initial.style.display = 'none';
       removeBtn.style.display = 'inline-flex';
+      if (colorGroup) colorGroup.style.display = 'none';
     } else {
       img.style.display = 'none';
       img.src = '';
       initial.style.display = 'block';
       removeBtn.style.display = 'none';
+      if (colorGroup) colorGroup.style.display = '';
     }
 
     if (window.userName) {
