@@ -963,6 +963,13 @@
     return row[shareFps] || row[30];
   }
 
+  // The relay bitrate cap (1.2Mbps) stays fixed regardless of capture
+  // resolution — sending 1080p/1440p through that budget spreads it too
+  // thin and comes out blocky/blurry no matter how high the quality
+  // setting is. Scale the *encoded* output down (not the capture) so the
+  // same capped bitrate lands on fewer pixels and looks sharp instead.
+  const RELAY_SCALE_DOWN = { '720': 1, '1080': 1.5, '1440': 2, 'source': 2.5 };
+
   function applyBandwidthLimit(pc, peer) {
     pc.getSenders().forEach(sender => {
       if (!sender.track) return;
@@ -978,6 +985,8 @@
         // connection silently stalling / cycling reconnects under congestion.
         if (peer && peer.isRelayed) bitrate = Math.min(bitrate, 1200000);
         params.encodings[0].maxBitrate = bitrate;
+        params.encodings[0].scaleResolutionDownBy = (peer && peer.isRelayed)
+          ? (RELAY_SCALE_DOWN[shareResolution] || 1.5) : 1;
         // Keep resolution crisp and let the encoder drop frames first only
         // when the user explicitly picked 'detail'; default to smooth
         // frame rate otherwise (see currentShareDegradationPreference).
@@ -2136,11 +2145,9 @@
           // instead of letting a congested relay silently stall/loop the
           // connection under a bitrate it was never going to sustain.
           const nowRelayed = candidateTypes[activeLocalId] === 'relay' || candidateTypes[activeRemoteId] === 'relay';
-          if (nowRelayed && !peer.isRelayed) {
-            peer.isRelayed = true;
-            applyBandwidthLimit(pc, peer);
-          } else if (!nowRelayed) {
-            peer.isRelayed = false;
+          if (nowRelayed !== peer.isRelayed) {
+            peer.isRelayed = nowRelayed;
+            applyBandwidthLimit(pc, peer); // re-applies bitrate cap + resolution scale for the new path
           }
 
           // Cumulative counters since connect — diff against the last poll
