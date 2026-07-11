@@ -2171,15 +2171,18 @@
     if (overlay.classList.contains('show')) return; // already mid-attempt — don't stack timers
     overlay.classList.add('show');
     updateConnectingSub('Setting up your voice room');
+    const refreshBtn = $('#btn-connecting-refresh');
+    if (refreshBtn) refreshBtn.style.display = 'none';
     // The signaling host is free-tier and can cold-start in 30-90s — give it
     // a real runway instead of a flat cliff, with honest progressive status.
     connectingTimers.push(setTimeout(() => updateConnectingSub('Still connecting — server may be waking up…'), 8000));
+    // Manual escape hatch shows up once it's clearly taking a while — a full
+    // reload sidesteps any stuck socket/state instead of retrying the same path.
+    connectingTimers.push(setTimeout(() => { if (refreshBtn) refreshBtn.style.display = 'inline-block'; }, 8000));
     connectingTimers.push(setTimeout(() => updateConnectingSub('This can take up to a minute on a cold start…'), 25000));
     connectingTimers.push(setTimeout(() => {
-      dismissConnectingOverlay();
-      if (socket) socket.disconnect(); // deterministic stop — no silent background retry after giving up
-      window._pendingJoin = null;
-      toast("Couldn't reach the server — please try again", 'error');
+      // Give up and reload automatically — never leave the user parked on a dead overlay.
+      window.location.reload();
     }, 55000));
   }
 
@@ -2188,6 +2191,8 @@
     connectingTimers = [];
     $('#connecting-overlay').classList.remove('show');
   }
+
+  $('#btn-connecting-refresh')?.addEventListener('click', () => window.location.reload());
 
   function connectSocket() {
     if (socket && socket.connected) return;
@@ -4473,6 +4478,10 @@
         const msgEl = actReact.closest('.chat-msg');
         if (msgEl) {
           msgEl.appendChild(popup);
+          const container = $('#chat-messages');
+          if (container && msgEl.getBoundingClientRect().top - container.getBoundingClientRect().top < 40) {
+            popup.classList.add('flip-below');
+          }
         } else {
           actReact.parentElement.appendChild(popup);
         }

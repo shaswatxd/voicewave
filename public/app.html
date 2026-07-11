@@ -13,7 +13,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.117">
+<link rel="stylesheet" href="/app.css?v=1.0.118">
 <!-- Consolidated Styles moved to app.css -->
 </head>
 <body>
@@ -44,6 +44,7 @@
   <div class="connecting-spinner"></div>
   <div class="connecting-text">Connecting<span class="connecting-dots"><span>.</span><span>.</span><span>.</span></span></div>
   <div class="connecting-sub" id="connecting-sub">Setting up your voice room</div>
+  <button class="btn btn-sm connecting-refresh-btn" id="btn-connecting-refresh" style="display:none;">Refresh</button>
 </div>
 
 <!-- TOAST CONTAINER -->
@@ -756,7 +757,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.117';
+  window.APP_VERSION = '1.0.118';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -794,6 +795,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.117"></script>
+<script src="/app.js?v=1.0.118"></script>
 </body>
 </html>
