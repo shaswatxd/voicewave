@@ -165,9 +165,20 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (room.password && room.password !== password) {
-      socket.emit('room-wrong-password', { roomId });
-      return;
+    if (room.password) {
+      // No password submitted at all (first attempt, joiner didn't know one
+      // was set) — prompt for it instead of flatly calling it "wrong",
+      // which is what was happening before: an empty password always
+      // failed the strict equality check below and got treated the same
+      // as an actually-incorrect one.
+      if (!password) {
+        socket.emit('room-requires-password', { roomId });
+        return;
+      }
+      if (room.password !== password) {
+        socket.emit('room-wrong-password', { roomId });
+        return;
+      }
     }
 
     if (room.users.size >= MAX_USERS) {
