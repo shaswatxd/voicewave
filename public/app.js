@@ -232,6 +232,7 @@
   let screenShares = {};        // socketId -> { socketId, name, streamId } — every live share in the room
   let remoteScreenStreams = {}; // socketId -> MediaStream — received screen streams
   let focusedShareId = null;    // which share is on the big stage
+  let viewerDismissedFocus = false; // viewer explicitly closed their view — don't auto re-focus them onto a share
   let watcherCounts = {};       // sharerSocketId -> live viewer count (Discord Go-Live style)
   let lastWatchingEmit = undefined; // last focusedShareId we told the server we're watching
   let connectingWaitTimer = null; // "still connecting" message escalation for the stage-waiting spinner
@@ -1403,6 +1404,7 @@
       if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => {});
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       focusedShareId = null;
+      viewerDismissedFocus = false;
       clearConnectingWaitTimer();
       return;
     }
@@ -1413,7 +1415,7 @@
     // Your OWN share (mySocketId) is exempt — that's your own action, not
     // an auto-displayed share of someone else's screen.
     if (focusedShareId && !screenShares[focusedShareId]) focusedShareId = null;
-    if (!focusedShareId && (!manualShareFocus || shares.length === 1 && shares[0].socketId === mySocketId)) {
+    if (!focusedShareId && !viewerDismissedFocus && (!manualShareFocus || shares.length === 1 && shares[0].socketId === mySocketId)) {
       focusedShareId = shares[0].socketId;
     }
 
@@ -1434,6 +1436,7 @@
       if (waitingTxt) waitingTxt.textContent = 'Click a stream below to watch';
       $('#stage-stop').style.display = isScreenSharing ? 'inline-flex' : 'none';
       $('#stage-pause').style.display = 'none';
+      $('#stage-close-view').style.display = 'none';
       $('#stage-switch-source').style.display = 'none';
       const qualityWrapHidden = $('#stage-quality-wrap');
       if (qualityWrapHidden) qualityWrapHidden.style.display = 'none';
@@ -1510,6 +1513,7 @@
     $('#stage-pause').style.display = isLocal && isScreenSharing ? 'inline-flex' : 'none';
     $('#stage-pause').classList.toggle('active', !!share.paused);
     $('#stage-pause').title = share.paused ? 'Resume sharing' : 'Pause sharing';
+    $('#stage-close-view').style.display = !isLocal ? 'inline-flex' : 'none';
     $('#stage-switch-source').style.display = isLocal && isScreenSharing ? 'inline-flex' : 'none';
     const qualityWrap = $('#stage-quality-wrap');
     if (qualityWrap) qualityWrap.style.display = isLocal && isScreenSharing ? 'inline-flex' : 'none';
@@ -1556,6 +1560,7 @@
         `;
         tile.addEventListener('click', () => {
           focusedShareId = tile.dataset.share;
+          viewerDismissedFocus = false;
           renderScreenShares();
         });
         strip.appendChild(tile);
@@ -2635,6 +2640,7 @@
     // 🖥️ Screen share events (multiple simultaneous streams)
     socket.on('screen-share-started', (data) => {
       screenShares[data.socketId] = data;
+      viewerDismissedFocus = false; // a fresh share should still be able to auto-focus per the usual rules
       if (data.socketId === mySocketId) {
         // Server approved our share — start pushing tracks (guard against
         // double-adds after a reconnect where tracks were re-added already)
@@ -3790,6 +3796,13 @@
     $('#stage-stop')?.addEventListener('click', () => stopScreenShare());
     $('#stage-pause')?.addEventListener('click', () => togglePauseScreenShare());
     $('#stage-switch-source')?.addEventListener('click', switchScreenSource);
+    // Viewer-only: stop watching without ending the sharer's stream — drops
+    // back to the thumbnail picker (or fully collapses if it was the only share).
+    $('#stage-close-view')?.addEventListener('click', () => {
+      focusedShareId = null;
+      viewerDismissedFocus = true;
+      renderScreenShares();
+    });
 
     $('#stage-quality')?.addEventListener('click', (e) => {
       e.stopPropagation();
