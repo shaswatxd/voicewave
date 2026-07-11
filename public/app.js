@@ -400,7 +400,7 @@
     const initial = $('#profile-avatar-initial');
     const img = $('#profile-avatar-img');
     const removeBtn = $('#btn-remove-avatar');
-    const nameEl = $('#profile-name');
+    const nameEl = $('#profile-name') || $('#profile-display-name-input');
 
     if (userAvatar) {
       img.src = userAvatar;
@@ -409,13 +409,20 @@
       removeBtn.style.display = 'inline-flex';
     } else {
       img.style.display = 'none';
+      img.src = '';
       initial.style.display = 'block';
       removeBtn.style.display = 'none';
     }
 
     if (window.userName) {
       initial.textContent = getInitial(window.userName);
-      nameEl.textContent = window.userName;
+      if (nameEl) {
+        if (nameEl.tagName === 'INPUT') {
+          nameEl.value = window.userName;
+        } else {
+          nameEl.textContent = window.userName;
+        }
+      }
     }
     updateProfileAvatarColorOrText();
   }
@@ -4007,8 +4014,10 @@
         window.userName = savedName;
         const createInput = $('#create-name');
         const joinInput = $('#join-name');
+        const profileInput = $('#profile-display-name-input');
         if (createInput) createInput.value = savedName;
         if (joinInput) joinInput.value = savedName;
+        if (profileInput) profileInput.value = savedName;
       }
     } catch (e) { /* ignore */ }
 
@@ -4026,11 +4035,7 @@
 
     const updateProfileName = (name, originEl = null) => {
       window.userName = name;
-      const nameEl = $('#profile-name');
       const initialEl = $('#profile-avatar-initial');
-      if (nameEl && !nameEl.querySelector('input')) {
-        nameEl.textContent = name || 'Set your profile';
-      }
       if (initialEl) {
         initialEl.textContent = getInitial(name);
       }
@@ -4041,56 +4046,22 @@
       // Sync input fields
       const createInput = $('#create-name');
       const joinInput = $('#join-name');
+      const profileInput = $('#profile-display-name-input');
       if (createInput && createInput !== originEl && createInput.value !== name) {
         createInput.value = name;
       }
       if (joinInput && joinInput !== originEl && joinInput.value !== name) {
         joinInput.value = name;
       }
+      if (profileInput && profileInput !== originEl && profileInput.value !== name) {
+        profileInput.value = name;
+      }
     };
     $('#create-name').addEventListener('input', (e) => updateProfileName(e.target.value.trim(), e.target));
     $('#join-name').addEventListener('input', (e) => updateProfileName(e.target.value.trim(), e.target));
-
-    // Inline edit for profile name
-    const profileNameEl = $('#profile-name');
-    if (profileNameEl) {
-      profileNameEl.addEventListener('click', (e) => {
-        if (profileNameEl.querySelector('input')) return; // already editing
-
-        const currentName = window.userName || '';
-        profileNameEl.innerHTML = '';
-
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = currentName;
-        input.maxLength = 20;
-        input.className = 'profile-name-edit-input';
-        input.placeholder = 'Enter display name';
-
-        profileNameEl.appendChild(input);
-        input.focus();
-        input.select();
-
-        let finished = false;
-        const finishEditing = () => {
-          if (finished) return;
-          finished = true;
-          const newName = input.value.trim();
-          updateProfileName(newName);
-          profileNameEl.textContent = newName || 'Set your profile';
-        };
-
-        input.addEventListener('keydown', (ev) => {
-          if (ev.key === 'Enter') {
-            input.blur();
-          } else if (ev.key === 'Escape') {
-            finished = true;
-            profileNameEl.textContent = currentName || 'Set your profile';
-          }
-        });
-
-        input.addEventListener('blur', finishEditing);
-      });
+    const profileInput = $('#profile-display-name-input');
+    if (profileInput) {
+      profileInput.addEventListener('input', (e) => updateProfileName(e.target.value.trim(), e.target));
     }
 
     $('#btn-create').addEventListener('click', () => {
