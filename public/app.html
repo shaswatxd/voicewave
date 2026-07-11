@@ -13,7 +13,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.93">
+<link rel="stylesheet" href="/app.css?v=1.0.94">
 <!-- Consolidated Styles moved to app.css -->
 </head>
 <body>
@@ -752,7 +752,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.93';
+  window.APP_VERSION = '1.0.94';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -782,22 +782,14 @@
     });
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
-      // A new SW taking control means a new deploy just landed — reload to
-      // pick it up automatically instead of leaving the user on stale code
-      // until they happen to fully close and reopen the app. Skip the
-      // reload if they're mid-call (only safe to do from the lobby screen).
-      let reloadedOnce = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (reloadedOnce) return;
-        const lobby = document.getElementById('lobby');
-        if (lobby && lobby.classList.contains('active')) {
-          reloadedOnce = true;
-          window.location.reload();
-        }
-      });
+      // No forced reload on a new SW taking control: sw.js fetches
+      // network-first (cache is just an offline fallback), so whatever
+      // already loaded in this page session is already fresh — an auto
+      // reload here only served to interrupt people mid-flow (e.g. right
+      // as they're creating a room) for no actual freshness benefit.
     }
   }
 </script>
-<script src="/app.js?v=1.0.93"></script>
+<script src="/app.js?v=1.0.94"></script>
 </body>
 </html>
