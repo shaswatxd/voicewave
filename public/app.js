@@ -937,6 +937,19 @@
     return pc;
   }
 
+  // 'auto' now favors smooth motion by default — under bandwidth pressure
+  // (relay TURN, capped upload) a decoder that holds resolution and drops
+  // frames instead reads as laggy/stuttery, which is worse for most screen
+  // shares (video, scrolling, live apps) than a softer image. Only an
+  // explicit 'detail' choice keeps resolution crisp at the cost of smoothness.
+  function currentShareContentHint() {
+    return shareOptimize === 'detail' ? 'detail' : 'motion';
+  }
+
+  function currentShareDegradationPreference() {
+    return shareOptimize === 'detail' ? 'maintain-resolution' : 'maintain-framerate';
+  }
+
   function currentShareBitrate() {
     if (lowBandwidthEnabled) return 800000;
     // Discord-like ladder: scale with resolution × frame rate
@@ -965,10 +978,10 @@
         // connection silently stalling / cycling reconnects under congestion.
         if (peer && peer.isRelayed) bitrate = Math.min(bitrate, 1200000);
         params.encodings[0].maxBitrate = bitrate;
-        // Keep resolution crisp and let the encoder drop frames first for
-        // text content; for motion content prefer smooth frame rate.
-        params.degradationPreference = (shareOptimize === 'motion' || (shareOptimize === 'auto' && shareFps >= 60))
-          ? 'maintain-framerate' : 'maintain-resolution';
+        // Keep resolution crisp and let the encoder drop frames first only
+        // when the user explicitly picked 'detail'; default to smooth
+        // frame rate otherwise (see currentShareDegradationPreference).
+        params.degradationPreference = currentShareDegradationPreference();
       }
       sender.setParameters(params).catch(err => console.warn('Bitrate limit error:', err));
     });
@@ -1193,7 +1206,7 @@
     }
     try {
       await videoTrack.applyConstraints(constraints);
-      try { videoTrack.contentHint = shareFps >= 60 ? 'motion' : 'detail'; } catch (e) {}
+      try { videoTrack.contentHint = currentShareContentHint(); } catch (e) {}
       toast('Stream quality updated', 'success');
     } catch (err) {
       console.error('[VoiceWave] applyLiveQuality error:', err);
@@ -1228,7 +1241,7 @@
       screenStream = stream;
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
-        const hint = shareOptimize === 'auto' ? (shareFps >= 60 ? 'motion' : 'detail') : shareOptimize;
+        const hint = currentShareContentHint();
         try { videoTrack.contentHint = hint; } catch (e) {}
         videoTrack.onended = () => stopScreenShare(); // window closed / capture killed
       }
@@ -1265,7 +1278,7 @@
       screenStream = stream;
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
-        const hint = shareOptimize === 'auto' ? (shareFps >= 60 ? 'motion' : 'detail') : shareOptimize;
+        const hint = currentShareContentHint();
         try { videoTrack.contentHint = hint; } catch (e) {}
         videoTrack.onended = () => stopScreenShare();
       }
@@ -1359,7 +1372,7 @@
 
     screenStream = newStream;
     if (newVideoTrack) {
-      const hint = shareOptimize === 'auto' ? (shareFps >= 60 ? 'motion' : 'detail') : shareOptimize;
+      const hint = currentShareContentHint();
       try { newVideoTrack.contentHint = hint; } catch (e) {}
       newVideoTrack.onended = () => stopScreenShare();
     }
