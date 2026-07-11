@@ -13,7 +13,7 @@
 <meta name="application-name" content="VoiceWave">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=1.0.97">
+<link rel="stylesheet" href="/app.css?v=1.0.98">
 <!-- Consolidated Styles moved to app.css -->
 </head>
 <body>
@@ -141,7 +141,7 @@
           <input type="file" id="avatar-input" accept="image/*" style="display:none;">
         </div>
         <div class="profile-info">
-          <div class="profile-name" id="profile-name">Set your name to start</div>
+          <div class="profile-name" id="profile-name">Set your profile</div>
         </div>
         <button class="btn btn-ghost btn-sm profile-remove-btn" id="btn-remove-avatar" style="display:none; margin-top:10px;">Remove Photo</button>
       </div>
@@ -708,7 +708,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  window.APP_VERSION = '1.0.97';
+  window.APP_VERSION = '1.0.98';
   if (window.electronAPI && window.electronAPI.isElectron) {
     document.getElementById('titlebar').style.display = 'flex';
     document.getElementById('tb-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -746,6 +746,6 @@
     }
   }
 </script>
-<script src="/app.js?v=1.0.97"></script>
+<script src="/app.js?v=1.0.98"></script>
 </body>
 </html>

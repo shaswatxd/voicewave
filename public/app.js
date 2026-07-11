@@ -4000,6 +4000,18 @@
       });
     }
 
+    // Load saved username on init
+    try {
+      const savedName = localStorage.getItem('vw_username') || '';
+      if (savedName) {
+        window.userName = savedName;
+        const createInput = $('#create-name');
+        const joinInput = $('#join-name');
+        if (createInput) createInput.value = savedName;
+        if (joinInput) joinInput.value = savedName;
+      }
+    } catch (e) { /* ignore */ }
+
     // Load saved avatar on init
     loadAvatar();
 
@@ -4012,15 +4024,74 @@
       });
     });
 
-    const updateProfileName = (name) => {
+    const updateProfileName = (name, originEl = null) => {
       window.userName = name;
       const nameEl = $('#profile-name');
       const initialEl = $('#profile-avatar-initial');
-      if (nameEl) nameEl.textContent = name || 'Set your name to start';
-      if (initialEl) initialEl.textContent = getInitial(name);
+      if (nameEl && !nameEl.querySelector('input')) {
+        nameEl.textContent = name || 'Set your profile';
+      }
+      if (initialEl) {
+        initialEl.textContent = getInitial(name);
+      }
+      try {
+        localStorage.setItem('vw_username', name);
+      } catch (e) { /* ignore */ }
+
+      // Sync input fields
+      const createInput = $('#create-name');
+      const joinInput = $('#join-name');
+      if (createInput && createInput !== originEl && createInput.value !== name) {
+        createInput.value = name;
+      }
+      if (joinInput && joinInput !== originEl && joinInput.value !== name) {
+        joinInput.value = name;
+      }
     };
-    $('#create-name').addEventListener('input', (e) => updateProfileName(e.target.value.trim()));
-    $('#join-name').addEventListener('input', (e) => updateProfileName(e.target.value.trim()));
+    $('#create-name').addEventListener('input', (e) => updateProfileName(e.target.value.trim(), e.target));
+    $('#join-name').addEventListener('input', (e) => updateProfileName(e.target.value.trim(), e.target));
+
+    // Inline edit for profile name
+    const profileNameEl = $('#profile-name');
+    if (profileNameEl) {
+      profileNameEl.addEventListener('click', (e) => {
+        if (profileNameEl.querySelector('input')) return; // already editing
+
+        const currentName = window.userName || '';
+        profileNameEl.innerHTML = '';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentName;
+        input.maxLength = 20;
+        input.className = 'profile-name-edit-input';
+        input.placeholder = 'Enter display name';
+
+        profileNameEl.appendChild(input);
+        input.focus();
+        input.select();
+
+        let finished = false;
+        const finishEditing = () => {
+          if (finished) return;
+          finished = true;
+          const newName = input.value.trim();
+          updateProfileName(newName);
+          profileNameEl.textContent = newName || 'Set your profile';
+        };
+
+        input.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') {
+            input.blur();
+          } else if (ev.key === 'Escape') {
+            finished = true;
+            profileNameEl.textContent = currentName || 'Set your profile';
+          }
+        });
+
+        input.addEventListener('blur', finishEditing);
+      });
+    }
 
     $('#btn-create').addEventListener('click', () => {
       const name = $('#create-name').value.trim();

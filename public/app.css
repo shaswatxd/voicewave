@@ -832,6 +832,47 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
   color: var(--text);
   margin-bottom: 4px;
   word-break: break-word;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin-left: -8px;
+  margin-right: -8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+  transition: background-color 0.2s, color 0.2s;
+}
+.profile-name:not(:has(input)):hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--primary, #38bdf8);
+}
+.profile-name:not(:has(input))::after {
+  content: '✏️';
+  font-size: 0.8rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.profile-name:not(:has(input)):hover::after {
+  opacity: 0.7;
+}
+.profile-name-edit-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 2px 8px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+.profile-name-edit-input:focus {
+  border-color: var(--primary, #38bdf8);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
 }
 .profile-hint {
   font-size: 0.75rem;
