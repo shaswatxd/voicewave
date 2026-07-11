@@ -836,6 +836,58 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
   border-color: rgba(239,68,68,0.4) !important;
 }
 
+/* ── CUSTOM SELECT (status / avatar color) ──
+   Native <select> can't be themed where it matters most — the open option
+   list renders with the OS/browser's own colors (stark white on Windows),
+   clashing with the dark UI. A button + absolutely-positioned menu gives
+   full control and a consistent look everywhere. */
+.custom-select { position: relative; width: 100%; text-align: left; }
+.custom-select-trigger {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; box-sizing: border-box;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.78rem; font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.custom-select-trigger:hover { border-color: rgba(34,211,238,0.35); background: rgba(255,255,255,0.05); }
+.custom-select-trigger span:first-of-type { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.custom-select-trigger svg { flex-shrink: 0; color: var(--muted); transition: transform 0.15s ease; }
+.custom-select.open .custom-select-trigger svg { transform: rotate(180deg); }
+.custom-select.open .custom-select-trigger { border-color: var(--cyan); }
+.custom-select-menu {
+  display: none;
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+  background: var(--bg-panel, #12141a);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+  overflow: hidden;
+  z-index: 50;
+  animation: ddIn 0.15s ease;
+}
+.custom-select.open .custom-select-menu { display: block; }
+.custom-select-option {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; box-sizing: border-box;
+  padding: 9px 12px;
+  background: transparent; border: none;
+  color: var(--text); font-size: 0.78rem; font-family: inherit;
+  text-align: left; cursor: pointer;
+  transition: background 0.12s ease;
+}
+.custom-select-option:hover { background: rgba(34,211,238,0.1); }
+.custom-select-option.selected { background: rgba(34,211,238,0.14); color: var(--cyan); font-weight: 600; }
+.color-swatch {
+  display: inline-block; width: 14px; height: 14px;
+  border-radius: 50%; flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
 /* ── RESPONSIVE ── */
 @supports (padding: env(safe-area-inset-top)) {
   .room-header { padding-top: calc(12px + env(safe-area-inset-top)); padding-left: calc(20px + env(safe-area-inset-left)); padding-right: calc(20px + env(safe-area-inset-right)); }

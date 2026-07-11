@@ -347,6 +347,35 @@
     return name ? name.charAt(0).toUpperCase() : '?';
   }
 
+  // Generic wiring for the button+menu custom dropdowns (status, avatar
+  // color) — replaces native <select>, whose open option list can't be
+  // themed and renders with jarring OS-default colors.
+  function initCustomSelect(wrapId, menuId, onSelect) {
+    const wrap = $(`#${wrapId}`);
+    const menu = $(`#${menuId}`);
+    if (!wrap || !menu) return;
+    const trigger = wrap.querySelector('.custom-select-trigger');
+
+    trigger?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      $$('.custom-select.open').forEach(el => { if (el !== wrap) el.classList.remove('open'); });
+      wrap.classList.toggle('open');
+    });
+
+    menu.querySelectorAll('.custom-select-option').forEach(opt => {
+      opt.addEventListener('click', () => {
+        menu.querySelectorAll('.custom-select-option').forEach(o => o.classList.remove('selected'));
+        opt.classList.add('selected');
+        wrap.classList.remove('open');
+        onSelect(opt.dataset.value);
+      });
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest(`#${wrapId}`)) wrap.classList.remove('open');
+    });
+  }
+
   function loadAvatar() {
     try {
       const saved = localStorage.getItem('vw_avatar');
@@ -3638,10 +3667,13 @@
       statusTextInput.value = myStatusText;
     }
 
-    const avatarColorSelect = $('#profile-avatar-color');
-    if (avatarColorSelect) {
-      avatarColorSelect.value = myAvatarColor;
-    }
+    const AVATAR_COLOR_LABELS_INIT = { cyan: 'Cyan Glow', purple: 'Purple Haze', pink: 'Pink Punch', green: 'Emerald', orange: 'Sunset Amber', red: 'Ruby Flare', blue: 'Royal Blue' };
+    const avatarColorLabel = $('#profile-avatar-color-trigger-label');
+    if (avatarColorLabel) avatarColorLabel.textContent = AVATAR_COLOR_LABELS_INIT[myAvatarColor] || myAvatarColor;
+    const avatarColorSwatch = $('#profile-avatar-color-swatch');
+    if (avatarColorSwatch) avatarColorSwatch.className = `color-swatch ${getAvatarClass(myAvatarColor)}`;
+    $(`#profile-avatar-color-menu [data-value="${myAvatarColor}"]`)?.classList.add('selected');
+    $(`#profile-status-menu [data-value="${myStatus}"]`)?.classList.add('selected');
     updateProfileAvatarColorOrText();
   }
 
@@ -3664,9 +3696,11 @@
     $('#lobby-theme-toggle')?.addEventListener('click', () => applyTheme(localTheme === 'dark' ? 'light' : 'dark'));
     $('#tb-theme-toggle')?.addEventListener('click', () => applyTheme(localTheme === 'dark' ? 'light' : 'dark'));
 
-    // Status Select trigger
-    $('#profile-status-select')?.addEventListener('change', (e) => {
-      myStatus = e.target.value;
+    // Status custom dropdown
+    const STATUS_LABELS = { online: '🟢 Online', idle: '🌙 Idle', dnd: '🔴 Do Not Disturb' };
+    initCustomSelect('status-select-wrap', 'profile-status-menu', (value) => {
+      myStatus = value;
+      $('#profile-status-trigger-label').textContent = STATUS_LABELS[value] || STATUS_LABELS.online;
       if (roomId && socket && socket.connected) {
         socket.emit('update-status', { roomId, status: myStatus });
       }
@@ -4285,9 +4319,15 @@
       }
     });
 
-    $('#profile-avatar-color')?.addEventListener('change', (e) => {
-      myAvatarColor = e.target.value;
+    const AVATAR_COLOR_LABELS = { cyan: 'Cyan Glow', purple: 'Purple Haze', pink: 'Pink Punch', green: 'Emerald', orange: 'Sunset Amber', red: 'Ruby Flare', blue: 'Royal Blue' };
+    initCustomSelect('avatar-color-select-wrap', 'profile-avatar-color-menu', (value) => {
+      myAvatarColor = value;
       localStorage.setItem('vw_avatar_color', myAvatarColor);
+      $('#profile-avatar-color-trigger-label').textContent = AVATAR_COLOR_LABELS[value] || value;
+      const swatch = $('#profile-avatar-color-swatch');
+      if (swatch) {
+        swatch.className = `color-swatch ${getAvatarClass(value)}`;
+      }
       updateProfileAvatarColorOrText();
       if (roomId && socket && socket.connected) {
         socket.emit('join-room', { roomId, userName: window.userName, muted: isMuted, joinOnly: true, password: roomPassword, avatar: getAvatarPayload() });
