@@ -167,7 +167,7 @@
   let isRecording = false;
   let recordingTimer = null;
   let recordingStartTime = null;
-  let speakingTimeout = null;
+
   let pollInterval = null;
   let pendingFile = null;
   let userAvatar = null; // base64 data URL or null
