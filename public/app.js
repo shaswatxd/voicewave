@@ -1094,8 +1094,16 @@
   let isSwitchingSource = false; // reuses the picker UI, but routes Go Live to a replaceTrack switch instead of a fresh start
 
   async function openScreenPicker(switching) {
-    if (!window.electronAPI || !window.electronAPI.getScreenSources) {
-      toast('Screen share is available in the desktop app only', 'error');
+    const isElectronApp = !!(window.electronAPI && window.electronAPI.isElectron);
+    if (!isElectronApp) {
+      if (isMobileDevice) {
+        toast('Screen share isn\'t supported on mobile browsers', 'error');
+        return;
+      }
+      // Desktop browser: skip the custom Electron source-picker modal — the
+      // browser's own native getDisplayMedia() prompt is the source picker.
+      if (switching) await performBrowserSourceSwitch();
+      else await startBrowserScreenShare();
       return;
     }
     isSwitchingSource = !!switching;
@@ -1238,6 +1246,58 @@
   function switchScreenSource() {
     if (!isScreenSharing) return;
     openScreenPicker(true);
+  }
+
+  // Desktop-browser path: no Electron desktopCapturer, so the browser's own
+  // native getDisplayMedia() dialog acts as the source picker.
+  async function startBrowserScreenShare() {
+    const videoConstraints = { frameRate: { ideal: shareFps, max: shareFps } };
+    const res = SHARE_RESOLUTIONS[shareResolution];
+    if (res) {
+      videoConstraints.width = { max: res.width };
+      videoConstraints.height = { max: res.height };
+    }
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: videoConstraints,
+        audio: true
+      });
+      screenStream = stream;
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        const hint = shareOptimize === 'auto' ? (shareFps >= 60 ? 'motion' : 'detail') : shareOptimize;
+        try { videoTrack.contentHint = hint; } catch (e) {}
+        videoTrack.onended = () => stopScreenShare();
+      }
+      socket.emit('screen-share-start', { roomId, streamId: stream.id });
+    } catch (err) {
+      console.error('[VoiceWave] screen share error:', err);
+      if (err && err.name !== 'NotAllowedError') {
+        toast('Could not start screen share: ' + (err.message || err.name), 'error');
+      }
+      cleanupScreenStream();
+    }
+  }
+
+  async function performBrowserSourceSwitch() {
+    if (!screenStream) return;
+    isSwitchingSource = false;
+    const withAudio = screenStream.getAudioTracks().length > 0;
+    const videoConstraints = { frameRate: { ideal: shareFps, max: shareFps } };
+    const res = SHARE_RESOLUTIONS[shareResolution];
+    if (res) {
+      videoConstraints.width = { max: res.width };
+      videoConstraints.height = { max: res.height };
+    }
+    try {
+      const newStream = await navigator.mediaDevices.getDisplayMedia({ video: videoConstraints, audio: withAudio });
+      await applySourceSwitch(newStream);
+    } catch (err) {
+      console.error('[VoiceWave] screen source switch error:', err);
+      if (err && err.name !== 'NotAllowedError') {
+        toast('Could not switch source: ' + (err.message || err.name), 'error');
+      }
+    }
   }
 
   async function performSourceSwitch() {
@@ -3865,14 +3925,15 @@
       }
     });
 
-    // ── SCREEN SHARE TRIGGERS (desktop app only) ──
-    // Browser getDisplayMedia() screen-capture varies wildly across
-    // browsers/OSes (permission prompts, missing system-audio support,
-    // unreliable on mobile) — the desktop app's native picker is the only
-    // properly-tested path, so sharing (starting a share) is desktop-only.
-    // Browser users can still watch shares from desktop users just fine.
+    // ── SCREEN SHARE TRIGGERS (desktop app + desktop browser) ──
+    // getDisplayMedia() screen-capture is unreliable on mobile browsers, so
+    // sharing (starting a share) is gated to non-mobile only. Desktop app
+    // uses its native Electron picker; desktop browsers use the browser's
+    // own native getDisplayMedia() prompt. Mobile browsers can still watch
+    // shares from others just fine.
     const screenShareBtn = $('#btn-screen-share');
-    const canShareScreen = !!(window.electronAPI && window.electronAPI.isElectron);
+    const isElectronApp = !!(window.electronAPI && window.electronAPI.isElectron);
+    const canShareScreen = isElectronApp || !isMobileDevice;
     if (screenShareBtn && canShareScreen) {
       screenShareBtn.style.display = 'flex';
       screenShareBtn.addEventListener('click', () => {
@@ -3881,9 +3942,9 @@
       });
     }
 
-    // ── DEVICE AUDIO SHARE TRIGGER (desktop app only — Windows loopback) ──
+    // ── DEVICE AUDIO SHARE TRIGGER (desktop app only — Windows loopback, real OS limit) ──
     const deviceAudioBtn = $('#btn-device-audio');
-    if (deviceAudioBtn && canShareScreen) {
+    if (deviceAudioBtn && isElectronApp) {
       deviceAudioBtn.style.display = 'flex';
       deviceAudioBtn.addEventListener('click', toggleDeviceAudioShare);
     }
