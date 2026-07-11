@@ -1,6 +1,23 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, globalShortcut, desktopCapturer, systemPreferences, shell, Notification } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
+
+// Base64-embedded PNG for the loading/error screens — an inline <svg> inside
+// a data:text/html URL rendered as a blank white box in testing (some
+// Chromium versions don't reliably rasterize inline SVG when the whole page
+// itself is a data: URL). A raster <img> data URI has no such edge case.
+let cachedLogoDataUri = null;
+function getLogoDataUri() {
+  if (cachedLogoDataUri) return cachedLogoDataUri;
+  try {
+    const buf = fs.readFileSync(path.join(__dirname, 'assets', 'icon.png'));
+    cachedLogoDataUri = `data:image/png;base64,${buf.toString('base64')}`;
+  } catch (e) {
+    cachedLogoDataUri = '';
+  }
+  return cachedLogoDataUri;
+}
 
 // ── GPU compatibility flags for older/low-end PCs ──
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -49,8 +66,9 @@ function getLoadingHTML() {
   }
   .container { text-align: center; animation: fadeIn 0.5s ease; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-  .logo-svg {
+  .logo-img {
     width: 80px; height: 80px; margin: 0 auto 24px;
+    display: block; border-radius: 18px;
     animation: pulse 2s ease-in-out infinite;
   }
   @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
@@ -68,17 +86,7 @@ function getLoadingHTML() {
   .error-msg { display: none; color: #f87171; margin-top: 16px; font-size: 13px; }
 </style></head>
 <body><div class="container">
-  <svg class="logo-svg" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <!-- Flat solid colors, no <defs>/gradients — gradient url(#id) refs can
-         fail to resolve when this markup is served through a data: URL, so
-         this uses only plain fills to guarantee it always renders. -->
-    <rect x="6" y="6" width="500" height="500" rx="118" fill="#0a0518" stroke="#22d3ee" stroke-width="14" />
-    <rect x="153" y="208" width="34" height="96" rx="17" fill="#22d3ee" />
-    <rect x="199" y="168" width="34" height="176" rx="17" fill="#22d3ee" />
-    <rect x="245" y="128" width="34" height="256" rx="17" fill="#ffffff" />
-    <rect x="291" y="168" width="34" height="176" rx="17" fill="#a855f7" />
-    <rect x="337" y="208" width="34" height="96" rx="17" fill="#a855f7" />
-  </svg>
+  <img class="logo-img" src="${getLogoDataUri()}" alt="VoiceWave">
   <h1>VoiceWave</h1>
   <p class="status" id="status">Connecting to server...</p>
   <div class="spinner" id="spinner"></div>
