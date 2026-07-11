@@ -174,7 +174,7 @@
   let pttEnabled = false;
   let pttKey = 'Space';
   let pttKeyPressed = false;
-  let myStatus = 'online';
+  let myStatus = localStorage.getItem('vw_status') || 'online';
   let echoCancellationEnabled = true;
   let lowBandwidthEnabled = false;
   let handRaised = false;
@@ -216,10 +216,135 @@
       avatarContainer.classList.remove('avatar-accent-cyan', 'avatar-accent-purple', 'avatar-accent-pink', 'avatar-accent-green', 'avatar-accent-orange', 'avatar-accent-red', 'avatar-accent-blue');
       if (!userAvatar) {
         avatarContainer.classList.add(getAvatarClass(myAvatarColor));
-        avatarContainer.style.background = '';
+        const colors = { cyan: '#22d3ee', purple: '#a855f7', pink: '#ec4899', green: '#22c55e', orange: '#f97316', red: '#ef4444', blue: '#3b82f6' };
+        avatarContainer.style.background = `linear-gradient(135deg, ${colors[myAvatarColor] || '#22d3ee'}, ${colors[myAvatarColor] || '#22d3ee'}dd)`;
       } else {
         avatarContainer.style.background = '';
       }
+    }
+  }
+
+  function createBannerParticles() {
+    const container = $('#banner-particles');
+    if (!container) return;
+    container.innerHTML = '';
+    for (let i = 0; i < 12; i++) {
+      const p = document.createElement('div');
+      p.className = 'banner-particle';
+      p.style.left = Math.random() * 100 + '%';
+      p.style.animationDuration = (2 + Math.random() * 3) + 's';
+      p.style.animationDelay = Math.random() * 4 + 's';
+      p.style.width = (2 + Math.random() * 3) + 'px';
+      p.style.height = p.style.width;
+      container.appendChild(p);
+    }
+  }
+
+  function updateProfileDisplayName() {
+    const nameDisplay = $('#profile-name-display');
+    const initial = $('#profile-avatar-initial');
+    if (nameDisplay && window.userName) {
+      nameDisplay.textContent = window.userName;
+    }
+    if (initial && window.userName) {
+      initial.textContent = getInitial(window.userName);
+    }
+  }
+
+  function updateProfileStatusDot() {
+    const dot = $('#profile-online-dot');
+    if (!dot) return;
+    dot.className = 'profile-online-dot';
+    if (myStatus === 'away') dot.classList.add('status-away');
+    else if (myStatus === 'dnd') dot.classList.add('status-dnd');
+    else if (myStatus === 'invisible') dot.classList.add('status-invisible');
+  }
+
+  function updateProfileStatusText() {
+    const el = $('#profile-status-text-display');
+    if (el) {
+      el.textContent = myStatusText || '';
+      el.style.display = myStatusText ? 'block' : 'none';
+    }
+  }
+
+  function updateProfileStats() {
+    const rooms = parseInt(localStorage.getItem('vw_rooms_joined') || '0');
+    const hours = parseInt(localStorage.getItem('vw_hours_listening') || '0');
+    const since = localStorage.getItem('vw_member_since');
+    const roomsEl = $('#stat-rooms');
+    const hoursEl = $('#stat-hours');
+    const sinceEl = $('#stat-since');
+    if (roomsEl) roomsEl.textContent = rooms;
+    if (hoursEl) hoursEl.textContent = hours >= 24 ? Math.floor(hours / 24) + 'd' : hours + 'h';
+    if (sinceEl) {
+      if (since) {
+        const d = new Date(parseInt(since));
+        sinceEl.textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      } else {
+        const now = Date.now();
+        localStorage.setItem('vw_member_since', now.toString());
+        sinceEl.textContent = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+    }
+  }
+
+  function initProfile() {
+    createBannerParticles();
+    updateProfileDisplayName();
+    updateProfileStatusDot();
+    updateProfileStatusText();
+    updateProfileStats();
+    updateProfileAvatarColorOrText();
+
+    // Status buttons
+    const statusBtns = $$('.status-btn');
+    statusBtns.forEach(btn => {
+      if (btn.dataset.status === myStatus) btn.classList.add('active');
+      else btn.classList.remove('active');
+      btn.addEventListener('click', () => {
+        statusBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        myStatus = btn.dataset.status;
+        localStorage.setItem('vw_status', myStatus);
+        updateProfileStatusDot();
+        toast('Status updated', 'success');
+      });
+    });
+
+    // Color picker
+    const colorBtns = $$('.color-swatch-btn');
+    colorBtns.forEach(btn => {
+      if (btn.dataset.color === myAvatarColor) btn.classList.add('active');
+      else btn.classList.remove('active');
+      btn.addEventListener('click', () => {
+        colorBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        myAvatarColor = btn.dataset.color;
+        localStorage.setItem('vw_avatar_color', myAvatarColor);
+        updateProfileAvatarColorOrText();
+      });
+    });
+
+    // Status text input
+    const statusInput = $('#profile-status-input');
+    const statusCount = $('#status-char-count');
+    if (statusInput) {
+      statusInput.value = myStatusText;
+      if (statusCount) statusCount.textContent = myStatusText.length + '/50';
+      statusInput.addEventListener('input', (e) => {
+        myStatusText = e.target.value.trim();
+        localStorage.setItem('vw_status_text', myStatusText);
+        if (statusCount) statusCount.textContent = myStatusText.length + '/50';
+        updateProfileStatusText();
+      });
+    }
+
+    // Name char count
+    const nameInput = $('#profile-display-name-input');
+    const nameCount = $('#name-char-count');
+    if (nameInput && nameCount) {
+      nameCount.textContent = (nameInput.value || '').length + '/20';
     }
   }
 
@@ -400,7 +525,7 @@
     const initial = $('#profile-avatar-initial');
     const img = $('#profile-avatar-img');
     const removeBtn = $('#btn-remove-avatar');
-    const nameEl = $('#profile-name') || $('#profile-display-name-input');
+    const nameEl = $('#profile-display-name-input');
 
     if (userAvatar) {
       img.src = userAvatar;
@@ -416,14 +541,11 @@
 
     if (window.userName) {
       initial.textContent = getInitial(window.userName);
-      if (nameEl) {
-        if (nameEl.tagName === 'INPUT') {
-          nameEl.value = window.userName;
-        } else {
-          nameEl.textContent = window.userName;
-        }
+      if (nameEl && nameEl.tagName === 'INPUT') {
+        nameEl.value = window.userName;
       }
     }
+    updateProfileDisplayName();
     updateProfileAvatarColorOrText();
   }
 
@@ -2140,6 +2262,11 @@
   }
 
   function beginConnecting() {
+    // Track room join stats
+    const rooms = parseInt(localStorage.getItem('vw_rooms_joined') || '0');
+    localStorage.setItem('vw_rooms_joined', rooms + 1);
+    updateProfileStats();
+
     const overlay = $('#connecting-overlay');
     if (overlay.classList.contains('show')) return; // already mid-attempt — don't stack timers
     overlay.classList.add('show');
@@ -4024,6 +4151,9 @@
     // Load saved avatar on init
     loadAvatar();
 
+    // Initialize profile features
+    initProfile();
+
     $$('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
         $$('.tab').forEach(t => t.classList.remove('active'));
@@ -4039,6 +4169,12 @@
       if (initialEl) {
         initialEl.textContent = getInitial(name);
       }
+      const nameDisplay = $('#profile-display-name-input');
+      const nameCount = $('#name-char-count');
+      if (nameCount && nameDisplay) {
+        nameCount.textContent = name.length + '/20';
+      }
+      updateProfileDisplayName();
       try {
         localStorage.setItem('vw_username', name);
       } catch (e) { /* ignore */ }
