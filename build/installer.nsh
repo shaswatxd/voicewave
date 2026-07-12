@@ -24,6 +24,11 @@
   nsExec::ExecToLog 'netsh advfirewall firewall add rule name="VoiceWave Outbound" dir=out action=allow program="$INSTDIR\VoiceWave.exe" enable=yes profile=any'
 !macroend
 
+!macro customInstallMode
+  ; Force current-user install — skip "Only for me / For all users" page
+  StrCpy $isForceCurrentInstall "1"
+!macroend
+
 !macro customUnInstall
   ; ── Remove Windows Firewall rules ──
   DetailPrint "Removing firewall rules..."

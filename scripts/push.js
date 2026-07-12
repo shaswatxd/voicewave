@@ -584,6 +584,93 @@ async function main() {
     fs.writeFileSync(path.join(assetsDir, 'icon.ico'), ico);
     ok('icon.ico generated (7 sizes)');
 
+    // ── Generate HD installer images (BMP, NSIS MUI2 format) ──
+    const BUILD = path.join(ROOT, 'build');
+    if (!fs.existsSync(BUILD)) fs.mkdirSync(BUILD, { recursive: true });
+
+    // Header banner (150x57) — dark gradient + equalizer bars + "VoiceWave" text
+    const headerSvg = `<svg width="150" height="57" viewBox="0 0 150 57" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="hg" x1="0" y1="0" x2="150" y2="57" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#0a0518"/>
+          <stop offset="100%" stop-color="#050311"/>
+        </linearGradient>
+        <linearGradient id="hb" x1="0" y1="0" x2="150" y2="57" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#22d3ee"/>
+          <stop offset="50%" stop-color="#a855f7"/>
+          <stop offset="100%" stop-color="#22d3ee"/>
+        </linearGradient>
+        <linearGradient id="hw" x1="0" y1="0" x2="0" y2="57" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#e0f7ff"/>
+          <stop offset="45%" stop-color="#22d3ee"/>
+          <stop offset="100%" stop-color="#a855f7"/>
+        </linearGradient>
+      </defs>
+      <rect width="150" height="57" fill="url(#hg)"/>
+      <rect x="0.5" y="0.5" width="149" height="56" rx="4" stroke="url(#hb)" fill="none"/>
+      <!-- Equalizer bars -->
+      <g transform="translate(12, 6)">
+        <rect x="0" y="14" width="5" height="18" rx="2.5" fill="url(#hw)"/>
+        <rect x="8" y="8" width="5" height="30" rx="2.5" fill="url(#hw)"/>
+        <rect x="16" y="2" width="5" height="42" rx="2.5" fill="#ffffff"/>
+        <rect x="24" y="8" width="5" height="30" rx="2.5" fill="url(#hw)"/>
+        <rect x="32" y="14" width="5" height="18" rx="2.5" fill="url(#hw)"/>
+      </g>
+      <!-- "VoiceWave" text -->
+      <text x="56" y="34" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="600" fill="#ffffff" letter-spacing="0.5">Voice</text>
+      <text x="100" y="34" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="600" fill="#22d3ee" letter-spacing="0.5">Wave</text>
+    </svg>`;
+
+    const headerRaw = await sharp(Buffer.from(headerSvg)).resize(150, 57).raw().toBuffer();
+    fs.writeFileSync(path.join(BUILD, 'header.bmp'), pngToBmp(headerRaw, 150, 57));
+    ok('build/header.bmp generated (150x57)');
+
+    // Sidebar (164x314) — tall dark panel with centered icon + gradient accent
+    const sidebarSvg = `<svg width="164" height="314" viewBox="0 0 164 314" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="sg" x1="0" y1="0" x2="164" y2="314" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#0a0518"/>
+          <stop offset="55%" stop-color="#050311"/>
+          <stop offset="100%" stop-color="#020103"/>
+        </linearGradient>
+        <linearGradient id="sb" x1="0" y1="0" x2="164" y2="314" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#22d3ee"/>
+          <stop offset="50%" stop-color="#a855f7"/>
+          <stop offset="100%" stop-color="#22d3ee"/>
+        </linearGradient>
+        <linearGradient id="sw" x1="0" y1="0" x2="0" y2="314" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#e0f7ff"/>
+          <stop offset="45%" stop-color="#22d3ee"/>
+          <stop offset="100%" stop-color="#a855f7"/>
+        </linearGradient>
+        <radialGradient id="sgr" cx="50%" cy="35%" r="45%">
+          <stop offset="0%" stop-color="#a855f7" stop-opacity="0.20"/>
+          <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="164" height="314" fill="url(#sg)"/>
+      <!-- Soft glow behind icon -->
+      <circle cx="82" cy="130" r="70" fill="url(#sgr)"/>
+      <!-- Icon (centered, ~80x80) -->
+      <g transform="translate(42, 90)">
+        <rect x="0" y="0" width="80" height="80" rx="18" fill="url(#sg)" stroke="url(#sb)" stroke-width="2"/>
+        <rect x="12" y="24" width="7" height="32" rx="3.5" fill="url(#sw)"/>
+        <rect x="23" y="14" width="7" height="52" rx="3.5" fill="url(#sw)"/>
+        <rect x="34" y="6" width="7" height="68" rx="3.5" fill="#ffffff"/>
+        <rect x="45" y="14" width="7" height="52" rx="3.5" fill="url(#sw)"/>
+        <rect x="56" y="24" width="7" height="32" rx="3.5" fill="url(#sw)"/>
+      </g>
+      <!-- "VoiceWave" vertical text -->
+      <text x="82" y="210" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="600" fill="#ffffff" letter-spacing="1">VoiceWave</text>
+      <!-- Gradient accent line -->
+      <rect x="30" y="225" width="104" height="2" rx="1" fill="url(#sb)"/>
+      <text x="82" y="248" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="8" fill="#8888aa">Real-time voice chat</text>
+    </svg>`;
+
+    const sidebarRaw = await sharp(Buffer.from(sidebarSvg)).resize(164, 314).raw().toBuffer();
+    fs.writeFileSync(path.join(BUILD, 'sidebar.bmp'), pngToBmp(sidebarRaw, 164, 314));
+    ok('build/sidebar.bmp generated (164x314)');
+
   } catch (e) {
     err('Icon generation skipped (sharp not available)');
   }
@@ -683,6 +770,46 @@ function buildICO(images) {
   }
 
   return Buffer.concat([header, ...images.map(i => i.buf)]);
+}
+
+// ── BMP conversion helpers (NSIS MUI2 requires BMP for header/sidebar) ──
+function pngToBmp(pngBuffer, width, height) {
+  const rowSize = Math.ceil((width * 3) / 4) * 4; // rows padded to 4-byte boundary
+  const pixelDataSize = rowSize * height;
+  const headerSize = 54;
+  const buf = Buffer.alloc(headerSize + pixelDataSize);
+
+  // BMP file header (14 bytes)
+  buf.write('BM', 0);
+  buf.writeUInt32LE(headerSize + pixelDataSize, 2);
+  buf.writeUInt32LE(0, 6);
+  buf.writeUInt32LE(headerSize, 10);
+
+  // DIB header (BITMAPINFOHEADER, 40 bytes)
+  buf.writeUInt32LE(40, 14);
+  buf.writeInt32LE(width, 18);
+  buf.writeInt32LE(-height, 22); // negative = top-down
+  buf.writeUInt16LE(1, 26);      // color planes
+  buf.writeUInt16LE(24, 28);     // bits per pixel
+  buf.writeUInt32LE(0, 30);      // no compression
+  buf.writeUInt32LE(pixelDataSize, 34);
+  buf.writeInt32LE(2835, 38);    // ~72 DPI
+  buf.writeInt32LE(2835, 42);
+  buf.writeUInt32LE(0, 46);
+  buf.writeUInt32LE(0, 50);
+
+  // Copy raw pixel data (sharp raw() gives RGB, BMP expects BGR)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const srcIdx = (y * width + x) * 3;
+      const dstIdx = headerSize + y * rowSize + x * 3;
+      buf[dstIdx]     = pngBuffer[srcIdx + 2]; // B
+      buf[dstIdx + 1] = pngBuffer[srcIdx + 1]; // G
+      buf[dstIdx + 2] = pngBuffer[srcIdx];     // R
+    }
+  }
+
+  return buf;
 }
 
 function sleep(ms) {
