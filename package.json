@@ -1,6 +1,6 @@
 {
   "name": "voicewave",
-  "version": "1.0.126",
+  "version": "1.0.127",
   "description": "Crystal-clear real-time voice chat — WebRTC P2P mesh with Socket.IO signaling",
   "main": "main.js",
   "scripts": {
@@ -43,8 +43,7 @@
       "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
+      "oneClick": true,
       "perMachine": false,
       "allowElevation": false,
       "runAfterFinish": true,
@@ -55,10 +54,7 @@
       "differentialPackage": true,
       "include": "build/installer.nsh",
       "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "installerHeader": "build/header.bmp",
-      "installerSidebar": "build/sidebar.bmp",
-      "uninstallerSidebar": "build/sidebar.bmp"
+      "uninstallerIcon": "assets/icon.ico"
     },
     "portable": {
       "artifactName": "VoiceWave-${version}-Portable.${ext}"
