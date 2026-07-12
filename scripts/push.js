@@ -773,7 +773,10 @@ function buildICO(images) {
 }
 
 // ── BMP conversion helpers (NSIS MUI2 requires BMP for header/sidebar) ──
-function pngToBmp(pngBuffer, width, height) {
+// NSIS only reads standard bottom-up BMPs (positive height, rows stored
+// from bottom row to top row). Top-down BMPs (negative height) are silently
+// ignored, resulting in no image displayed.
+function pngToBmp(rawRgbBuffer, width, height) {
   const rowSize = Math.ceil((width * 3) / 4) * 4; // rows padded to 4-byte boundary
   const pixelDataSize = rowSize * height;
   const headerSize = 54;
@@ -788,7 +791,7 @@ function pngToBmp(pngBuffer, width, height) {
   // DIB header (BITMAPINFOHEADER, 40 bytes)
   buf.writeUInt32LE(40, 14);
   buf.writeInt32LE(width, 18);
-  buf.writeInt32LE(-height, 22); // negative = top-down
+  buf.writeInt32LE(height, 22);  // positive = bottom-up (required by NSIS)
   buf.writeUInt16LE(1, 26);      // color planes
   buf.writeUInt16LE(24, 28);     // bits per pixel
   buf.writeUInt32LE(0, 30);      // no compression
@@ -798,14 +801,17 @@ function pngToBmp(pngBuffer, width, height) {
   buf.writeUInt32LE(0, 46);
   buf.writeUInt32LE(0, 50);
 
-  // Copy raw pixel data (sharp raw() gives RGB, BMP expects BGR)
+  // Copy pixel data: sharp raw() = top-to-bottom RGB
+  // BMP bottom-up = last row first, and RGB → BGR channel swap
   for (let y = 0; y < height; y++) {
+    const srcRow = y;                    // source: top-to-bottom
+    const dstRow = height - 1 - y;       // dest: bottom-to-top (flip)
     for (let x = 0; x < width; x++) {
-      const srcIdx = (y * width + x) * 3;
-      const dstIdx = headerSize + y * rowSize + x * 3;
-      buf[dstIdx]     = pngBuffer[srcIdx + 2]; // B
-      buf[dstIdx + 1] = pngBuffer[srcIdx + 1]; // G
-      buf[dstIdx + 2] = pngBuffer[srcIdx];     // R
+      const srcIdx = (srcRow * width + x) * 3;
+      const dstIdx = headerSize + dstRow * rowSize + x * 3;
+      buf[dstIdx]     = rawRgbBuffer[srcIdx + 2]; // B
+      buf[dstIdx + 1] = rawRgbBuffer[srcIdx + 1]; // G
+      buf[dstIdx + 2] = rawRgbBuffer[srcIdx];     // R
     }
   }
 
