@@ -1,27 +1,47 @@
 ; ═══════════════════════════════════════════════════════
 ; VoiceWave Custom NSIS Installer Script
-; - Windows Firewall rule (allows WebRTC/Socket.IO)
+; - Detects & silently removes previous installation before installing
+; - Windows Firewall rules (allows WebRTC/Socket.IO)
 ;
-; NOTE on antivirus false positives: this script used to silently add a
-; Windows Defender exclusion for the install directory. That's removed —
-; a silent AV exclusion is a known malware/PUP red flag, it can itself
-; trigger detections, and it leaves the install folder unscanned forever
-; (a real risk if that folder is ever compromised by a future bad update).
-; The legitimate fixes for unsigned-exe false positives are:
-;   1. Code-sign the .exe with a real certificate (OV/EV) — this is the
-;      actual long-term fix and builds SmartScreen reputation over time.
-;   2. Submit the installer for false-positive review (free):
+; NOTE on antivirus false positives: a silent AV exclusion is a known
+; malware/PUP red flag — it has been intentionally left out.
+; Proper fixes:
+;   1. Code-sign the .exe with a real certificate (OV/EV)
+;   2. Submit for false-positive review:
 ;      https://www.microsoft.com/en-us/wdsi/filesubmission
-;      https://www.virustotal.com (check + request re-analysis)
+;      https://www.virustotal.com
 ; ═══════════════════════════════════════════════════════
 
+; ── customInit → runs inside .onInit (a Function), so all NSIS commands valid ──
+; Detects any existing VoiceWave installation and silently removes it BEFORE
+; the new installer runs — prevents duplicate entries in Add/Remove Programs.
+!macro customInit
+  ; Check per-user install first (perMachine=false is our default)
+  ReadRegStr $R0 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\VoiceWave" "UninstallString"
+
+  ; Fallback: check per-machine install
+  ${If} $R0 == ""
+    ReadRegStr $R0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\VoiceWave" "UninstallString"
+  ${EndIf}
+
+  ; If a previous installation was found, uninstall it silently
+  ${If} $R0 != ""
+    ; /S = silent uninstall, no UI shown to user
+    ExecWait '$R0 /S'
+    ; Brief pause so the uninstaller process fully exits before we continue
+    Sleep 1500
+  ${EndIf}
+!macroend
+
 !macro customInstall
-  ; ── Add Windows Firewall rule for VoiceWave ──
+  ; ── Add Windows Firewall rules for VoiceWave ──
   ; Required for WebRTC peer-to-peer connections and Socket.IO signaling
-  DetailPrint "Adding firewall rule..."
-  nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="VoiceWave" 2>nul'
+  DetailPrint "Configuring firewall rules..."
+  nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="VoiceWave"'
+  nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="VoiceWave Outbound"'
   nsExec::ExecToLog 'netsh advfirewall firewall add rule name="VoiceWave" dir=in action=allow program="$INSTDIR\VoiceWave.exe" enable=yes profile=any'
   nsExec::ExecToLog 'netsh advfirewall firewall add rule name="VoiceWave Outbound" dir=out action=allow program="$INSTDIR\VoiceWave.exe" enable=yes profile=any'
+  DetailPrint "Firewall rules configured."
 !macroend
 
 !macro customInstallMode
@@ -30,7 +50,7 @@
 !macroend
 
 !macro customUnInstall
-  ; ── Remove Windows Firewall rules ──
+  ; ── Remove Windows Firewall rules on uninstall ──
   DetailPrint "Removing firewall rules..."
   nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="VoiceWave"'
   nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="VoiceWave Outbound"'
