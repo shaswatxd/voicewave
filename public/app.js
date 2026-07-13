@@ -4,6 +4,14 @@
     document.documentElement.classList.add('is-mobile');
   }
 
+  // ⚠️ FREE PUBLIC TURN servers (openrelay.metered.ca) are SHARED —
+  // unreliable for cross-network connections (symmetric NAT fails).
+  // For your friends from other cities to connect reliably:
+  //   1. Deploy coturn on a cheap VPS (DigitalOcean $6/mo, Hetzner €4/mo)
+  //   2. Add your own TURN servers BELOW the fallback ones
+  // Example:
+  //   { urls: 'turn:YOUR_VPS_IP:3478', username: 'voicewave', credential: 'your-password' },
+  //   { urls: 'turn:YOUR_VPS_IP:3478?transport=tcp', username: 'voicewave', credential: 'your-password' },
   const ICE_SERVERS = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
@@ -703,6 +711,14 @@
     teardownMicPipeline();
     const ctx = ensureAudioContext();
 
+    // Make sure AudioContext is fully running before building the pipeline —
+    // browsers suspend it on creation and only resume after a user gesture.
+    // Awaiting here prevents the pipeline from being constructed on a
+    // suspended context (which silently produces no audio output).
+    if (ctx.state === 'suspended') {
+      try { await ctx.resume(); } catch (e) { console.warn('[VoiceWave] AudioContext resume failed:', e); }
+    }
+
     micSourceNode = ctx.createMediaStreamSource(localStream);
 
     micGainNode = ctx.createGain();
@@ -729,6 +745,17 @@
     if (!masterGainNode) {
       masterGainNode = ctx.createGain();
       masterGainNode.gain.value = $('#master-volume') ? ($('#master-volume').value / 100) : 1;
+    }
+
+    // Swap the new processedMicTrack into any existing peer senders so a
+    // reconnect / mic-retry properly updates all open PeerConnections.
+    if (processedMicTrack) {
+      for (const peer of Object.values(peers)) {
+        const sender = peer.pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+        if (sender && sender.track !== processedMicTrack) {
+          sender.replaceTrack(processedMicTrack).catch(e => console.warn('[VoiceWave] replaceTrack failed:', e));
+        }
+      }
     }
   }
 
@@ -895,20 +922,37 @@
     // Guards a bad path (e.g. a congested TURN relay) from restarting on an
     // endless disconnected → restart → disconnected cycle — a real "loop"
     // symptom, not just a stuck spinner. After too many restarts in a short
-    // window we stop auto-restarting and tell the user plainly instead of
-    // silently retrying forever.
+    // window we pause, then try again — never permanently give up, because a
+    // temporarily overloaded TURN relay can recover after a short wait.
     function tryRestartIce(reason) {
       const now = Date.now();
-      peer.restartTimestamps = peer.restartTimestamps.filter(t => now - t < 30000);
-      if (peer.restartTimestamps.length >= 4) {
+      const WINDOW = 30000;
+      const MAX_RESTARTS = 4;
+      const RETRY_DELAY = 15000;
+
+      if (peer.reconnectRetryTimer) return;
+
+      peer.restartTimestamps = peer.restartTimestamps.filter(t => now - t < WINDOW);
+      if (peer.restartTimestamps.length >= MAX_RESTARTS) {
         if (!peer.reconnectGaveUp) {
           peer.reconnectGaveUp = true;
-          toast(`Having trouble staying connected to ${name} — their network connection may be unstable.`, 'error');
+          toast(`Having trouble staying connected to ${name} — retrying in ${RETRY_DELAY/1000}s…`, 'error');
         }
+        peer.reconnectRetryTimer = setTimeout(() => {
+          peer.reconnectRetryTimer = null;
+          peer.restartTimestamps = [];
+          peer.reconnectGaveUp = false;
+          toast(`Retrying connection to ${name}…`, 'info');
+          try { pc.restartIce(); } catch (e) {}
+        }, RETRY_DELAY);
         return;
       }
       peer.restartTimestamps.push(now);
       peer.reconnectGaveUp = false;
+      if (peer.reconnectRetryTimer) {
+        clearTimeout(peer.reconnectRetryTimer);
+        peer.reconnectRetryTimer = null;
+      }
       try { pc.restartIce(); } catch (e) {}
     }
 
@@ -1026,20 +1070,30 @@
     if (!localStream) return;
     const track = getOutgoingMicTrack();
     const stream = getOutgoingMicStream();
+    if (!track) return;
     for (const peer of Object.values(peers)) {
       const pc = peer.pc;
-      const hasAudioSender = pc.getSenders().some(s => s.track && s.track.kind === 'audio');
-      if (hasAudioSender) continue;
+      // Check for an active (non-ended) audio sender — a stale ended track
+      // needs to be replaced rather than skipped.
+      const existingSender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+      if (existingSender) {
+        // If the existing track is the same live track, skip; otherwise replace.
+        if (existingSender.track !== track && existingSender.track.readyState !== 'ended') continue;
+        if (existingSender.track !== track) {
+          existingSender.replaceTrack(track).catch(e => console.warn('[VoiceWave] replaceTrack failed:', e));
+        }
+        continue;
+      }
       // Reuse the recvonly transceiver when possible, otherwise add a fresh track
       const idleTx = pc.getTransceivers().find(t => t.receiver.track && t.receiver.track.kind === 'audio' && !t.sender.track);
-      if (idleTx && track) {
+      if (idleTx) {
         try {
           await idleTx.sender.replaceTrack(track);
           idleTx.direction = 'sendrecv';
         } catch (e) {
           pc.addTrack(track, stream);
         }
-      } else if (track) {
+      } else {
         pc.addTrack(track, stream);
       }
       applyBandwidthLimit(pc, peer);
@@ -1813,9 +1867,14 @@
     if (!audio) {
       audio = document.createElement('audio');
       audio.autoplay = true;
+      audio.playsInline = true;
       card.appendChild(audio);
     }
-    audio.srcObject = stream;
+    // Only reassign srcObject when the stream actually changed — reassigning
+    // the same object resets playback unnecessarily.
+    if (audio.srcObject !== stream) {
+      audio.srcObject = stream;
+    }
 
     // Set initial volume based on the volume slider value in the UI
     const slider = card.querySelector('[data-peer-volume]');
@@ -1832,17 +1891,27 @@
       audio.setSinkId(currentSinkId).catch(err => console.warn('setSinkId error:', err));
     }
 
-    // Explicitly play and handle autoplay policies
-    audio.play().catch(err => {
-      console.warn('[VoiceWave] Autoplay blocked for user audio:', err);
-      // Wait for a user click anywhere to resume/play audio
-      const resumeAudio = () => {
-        audio.play().then(() => {
-          document.removeEventListener('click', resumeAudio);
-        }).catch(e => console.error('[VoiceWave] Play failed after click:', e));
-      };
-      document.addEventListener('click', resumeAudio);
-    });
+    // Resume the shared AudioContext so the speaking indicator works, then play.
+    // Both steps are needed: a suspended context silences the analyser even if
+    // the <audio> itself plays via its own internal path.
+    const tryPlay = () => {
+      ensureAudioContext();
+      audio.play().catch(err => {
+        console.warn('[VoiceWave] Autoplay blocked for user audio:', err);
+        // Register a one-time click handler per audio element to resume playback.
+        // Using a named per-element handler so we don't stack duplicates.
+        if (!audio._resumeHandler) {
+          audio._resumeHandler = () => {
+            audio.play().then(() => {
+              document.removeEventListener('click', audio._resumeHandler);
+              audio._resumeHandler = null;
+            }).catch(e => console.error('[VoiceWave] Play failed after click:', e));
+          };
+          document.addEventListener('click', audio._resumeHandler);
+        }
+      });
+    };
+    tryPlay();
   }
 
   // Hidden per-peer <audio> elements for incoming device-audio shares — kept
@@ -1929,6 +1998,7 @@
         <div class="connection-bar"></div>
         <div class="connection-bar"></div>
       </div>
+      <div class="relay-badge" style="display:none" title="Relayed via TURN server">Relay</div>
     `;
 
     const handRaisedHtml = handRaisedState ? `<div class="hand-raise-badge">✋</div>` : '';
@@ -2191,6 +2261,8 @@
           if (nowRelayed !== peer.isRelayed) {
             peer.isRelayed = nowRelayed;
             applyBandwidthLimit(pc, peer); // re-applies bitrate cap + resolution scale for the new path
+            const relayBadge = card?.querySelector('.relay-badge');
+            if (relayBadge) relayBadge.style.display = nowRelayed ? '' : 'none';
           }
 
           // Cumulative counters since connect — diff against the last poll
@@ -2545,6 +2617,11 @@
           toast('Mic not available — others won\'t hear you', 'error');
           setMicBanner(true);
         }
+      } else {
+        // localStream already exists (e.g. reconnect after disconnect) —
+        // rebuild the audio pipeline so processedMicTrack is fresh and
+        // any stale AudioWorklet nodes from the old session are cleared.
+        await setupAudioProcessing();
       }
 
       // Creating the connection adds tracks, which triggers negotiation

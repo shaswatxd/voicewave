@@ -8,8 +8,8 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: '*' },
-  pingTimeout: 10000,
-  pingInterval: 5000,
+  pingTimeout: 30000,   // Was 10s — too short, caused repeated disconnects on slow/mobile networks
+  pingInterval: 10000,  // Was 5s — reduced ping frequency to lessen server load
   transports: ['websocket', 'polling'],
   maxHttpBufferSize: 110 * 1024 * 1024
 });

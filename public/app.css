@@ -1214,6 +1214,13 @@ body.light-theme .connection-bar { background: rgba(0,0,0,0.1); }
 .connection-bar:nth-child(3) { height: 7px; }
 .connection-bar:nth-child(4) { height: 9px; }
 
+/* ── TURN RELAY BADGE ── */
+.relay-badge {
+  position: absolute; top: 10px; left: 28px; font-size: 0.55rem; letter-spacing: 0.3px;
+  background: rgba(255,165,0,0.2); color: #f59e0b; padding: 0 4px; border-radius: 3px;
+  border: 1px solid rgba(255,165,0,0.3); line-height: 14px; pointer-events: none;
+}
+
 /* ── HAND RAISED BADGE ── */
 .hand-raise-badge {
   position: absolute; top: -6px; right: -6px; background: var(--warning); color: #000;
