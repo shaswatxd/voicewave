@@ -105,7 +105,7 @@ body {
 }
 
 /* Smooth transitions for theme toggle & layout shifts */
-nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn, .modal-card, .btn, .btn-icon, .pd-item, .profile-sidebar, .profile-avatar {
+nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn, .modal-card, .btn, .btn-icon, .pd-item {
   transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, width 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -746,307 +746,17 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
   overflow-y: auto;
 }
 
-/* ── PROFILE SIDEBAR ── */
-.profile-sidebar {
-  width: 280px;
-  flex-shrink: 0;
-  background: transparent;
-  border-left: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 20px 16px;
-  overflow-y: auto;
-}
-.profile-header {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  margin-bottom: 16px;
-  text-align: left;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border-light);
-}
-.profile-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  background: var(--glass);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  position: relative;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* ── Banner ── */
-.profile-banner {
-  height: 72px;
-  width: 100%;
-  border-radius: 11px 11px 0 0;
-  background: transparent;
-  position: relative;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-
-/* ── Avatar ── */
-.profile-avatar-container {
-  display: flex;
-  justify-content: center;
-  margin-top: -38px;
-  position: relative;
-  z-index: 2;
-  padding: 0 16px;
-  animation: avatarPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both;
-}
-@keyframes avatarPop {
-  from { opacity: 0; transform: scale(0.8); }
-  to { opacity: 1; transform: scale(1); }
-}
-.profile-avatar-wrapper {
-  position: relative;
-  width: 72px;
-  height: 72px;
-  cursor: pointer;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.profile-avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.6rem;
-  font-weight: 600;
-  color: #fff;
-  background: linear-gradient(135deg, var(--cyan), var(--purple));
-  overflow: hidden;
-  border: 3px solid var(--bg-card);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.profile-avatar-wrapper:hover .profile-avatar {
-  transform: scale(1.05);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-.profile-avatar-initial {
-  user-select: none;
-  line-height: 1;
-}
-.profile-avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 50%;
-}
-.profile-avatar-overlay {
-  position: absolute;
-  inset: 3px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  color: #fff;
-  font-size: 0.62rem;
-  font-weight: 600;
-}
-.profile-avatar-wrapper:hover .profile-avatar-overlay {
-  opacity: 1;
-}
-.profile-online-dot {
-  position: absolute;
-  bottom: 4px;
-  right: calc(50% - 42px);
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--success);
-  border: 2px solid var(--bg-card);
-  z-index: 3;
-  animation: dotBounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both;
-}
-@keyframes dotBounce {
-  from { opacity: 0; transform: scale(0); }
-  to { opacity: 1; transform: scale(1); }
-}
-.profile-online-dot.status-away { background: var(--warning); }
-.profile-online-dot.status-dnd { background: var(--danger); }
-.profile-online-dot.status-invisible { background: var(--muted); }
-
-/* ── Form ── */
-.profile-form {
-  padding: 12px 14px 14px;
-  width: 100%;
-  box-sizing: border-box;
-}
-.profile-form .form-group {
-  position: relative;
-  z-index: 1;
-  animation: formFade 0.35s ease both;
-}
-.profile-form .form-group:nth-child(1) { animation-delay: 0.15s; }
-.profile-form .form-group:nth-child(2) { animation-delay: 0.2s; }
-.profile-form .form-group:nth-child(3) { animation-delay: 0.25s; }
-.profile-form .form-group:nth-child(4) { animation-delay: 0.3s; }
-.profile-form .form-group:has(.custom-select.open) { z-index: 50; }
-.profile-form .profile-remove-btn { animation: formFade 0.35s ease 0.35s both; }
-@keyframes formFade {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.form-label {
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 5px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.form-label svg {
-  opacity: 0.5;
-}
-.form-group {
-  margin-bottom: 10px;
-}
-.profile-input-wrapper {
-  position: relative;
-  width: 100%;
-}
-.profile-input-wrapper input {
-  width: 100%;
-  padding: 12px 14px;
-  background: var(--glass);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  color: var(--text);
-  font-size: 0.88rem;
-  font-family: inherit;
-  font-weight: 500;
-  text-align: left;
-  outline: none;
-  box-sizing: border-box;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-.profile-input-wrapper input:focus {
-  border-color: var(--cyan);
-  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.1);
-}
-.profile-remove-btn {
-  width: 100%;
-  display: flex !important;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: 0.78rem !important;
-  padding: 9px 12px !important;
-  background: var(--glass) !important;
-  color: var(--danger) !important;
-  border: 1px solid rgba(239, 68, 68, 0.3) !important;
-  border-radius: 10px;
-  margin-top: 8px;
-  transition: all 0.15s ease !important;
-}
-.profile-remove-btn:hover {
-  background: rgba(239, 68, 68, 0.1) !important;
-  border-color: rgba(239, 68, 68, 0.5) !important;
-}
-
-/* ── CUSTOM SELECT (status / avatar color) ──
-   Native <select> can't be themed where it matters most — the open option
-   list renders with the OS/browser's own colors (stark white on Windows),
-   clashing with the dark UI. A button + absolutely-positioned menu gives
-   full control and a consistent look everywhere. */
-.custom-select { position: relative; width: 100%; text-align: left; }
-.custom-select-trigger {
-  display: flex; align-items: center; gap: 8px;
-  width: 100%; box-sizing: border-box;
-  padding: 10px 12px;
-  background: var(--glass);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  color: var(--text);
-  font-size: 0.8rem; font-family: inherit;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.custom-select-trigger:hover { border-color: rgba(34,211,238,0.35); background: rgba(255,255,255,0.05); }
-.custom-select-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.custom-select-trigger svg { flex-shrink: 0; color: var(--muted); transition: transform 0.15s ease; }
-.custom-select.open .custom-select-trigger svg { transform: rotate(180deg); }
-.custom-select.open .custom-select-trigger { border-color: var(--cyan); }
-.custom-select-menu {
-  display: none;
-  position: absolute; top: calc(100% + 6px); left: 0; right: 0;
-  background: var(--bg-panel, #12141a);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 12px 32px rgba(0,0,0,0.5);
-  overflow: hidden;
-  z-index: 50;
-  animation: ddIn 0.15s ease;
-}
-.custom-select.open .custom-select-menu { display: block; }
-.custom-select-option {
-  display: flex; align-items: center; gap: 8px;
-  width: 100%; box-sizing: border-box;
-  padding: 9px 12px;
-  background: transparent; border: none;
-  color: var(--text); font-size: 0.78rem; font-family: inherit;
-  text-align: left; cursor: pointer;
-  transition: background 0.12s ease;
-}
-.custom-select-option:hover { background: rgba(34,211,238,0.1); }
-.custom-select-option.selected { background: rgba(34,211,238,0.14); color: var(--cyan); font-weight: 600; }
-.color-swatch {
-  display: inline-block; width: 14px; height: 14px;
-  border-radius: 50%; flex: none;
-  border: 1px solid rgba(255,255,255,0.15);
-}
-
 /* ── RESPONSIVE ── */
 @supports (padding: env(safe-area-inset-top)) {
   .room-header { padding-top: calc(12px + env(safe-area-inset-top)); padding-left: calc(20px + env(safe-area-inset-left)); padding-right: calc(20px + env(safe-area-inset-right)); }
   .control-bar { padding-bottom: calc(12px + env(safe-area-inset-bottom)); padding-left: calc(20px + env(safe-area-inset-left)); padding-right: calc(20px + env(safe-area-inset-right)); }
   .lobby-container { padding-left: calc(24px + env(safe-area-inset-left)); padding-right: calc(24px + env(safe-area-inset-right)); }
-  .profile-sidebar { padding-left: calc(20px + env(safe-area-inset-left)); padding-right: calc(20px + env(safe-area-inset-right)); }
 }
 
 @media (max-width: 768px) {
   .lobby-layout {
     flex-direction: column;
   }
-  .profile-sidebar {
-    width: 100%;
-    border-left: none;
-    border-top: 1px solid var(--border);
-    padding: 20px 16px;
-  }
-  .profile-card { flex-direction: column; }
-  .profile-banner { height: 60px; }
-  .profile-avatar-wrapper,
-  .profile-avatar { width: 64px; height: 64px; }
-  .profile-avatar { font-size: 1.4rem; border-width: 2px; }
-  .profile-avatar-overlay span { display: none; }
-  .profile-sidebar { overflow-y: visible; max-height: none; }
   .chat-panel { width: 0; position: absolute; right: 0; top: 0; bottom: 0; border-left: none; border-radius: 0; }
   .chat-panel.open { width: 100%; }
   .chat-panel .modal-card { max-width: 100%; width: 100%; height: 100%; display: flex; flex-direction: column; border-radius: 0; }
@@ -1066,16 +776,6 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
 
 @media (max-width: 480px) {
   .lobby-layout { flex-direction: column; }
-  .profile-sidebar {
-    width: 100%; border-left: none;
-    border-top: 1px solid var(--border);
-    padding: 14px 12px;
-  }
-  .profile-card { flex-direction: column; }
-  .profile-banner { height: 52px; }
-  .profile-avatar-wrapper, .profile-avatar { width: 52px; height: 52px; }
-  .profile-avatar { font-size: 1.2rem; border-width: 2px; }
-  .profile-avatar-overlay span { display: none; }
   .user-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 10px; }
   .user-card { padding: 16px 10px; }
   .user-avatar { width: 48px; height: 48px; font-size: 1.1rem; }
@@ -1121,10 +821,6 @@ nav, .user-card, .lobby-card, .chat-panel, .chat-msg, .control-bar, .control-btn
 
 @media (max-width: 380px) {
   .lobby-layout { flex-direction: column; }
-  .profile-sidebar { padding: 10px; }
-  .profile-banner { height: 44px; }
-  .profile-avatar-wrapper, .profile-avatar { width: 44px; height: 44px; }
-  .profile-avatar { font-size: 1rem; }
   .user-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 8px; }
   .user-card { padding: 12px 6px; }
   .user-avatar { width: 40px; height: 40px; font-size: 1rem; }
@@ -2410,10 +2106,6 @@ body.light-theme .poll-option-bar-bg { background: rgba(0,0,0,0.03); border-colo
 }
 
 /* ── MOBILE BROWSER CUSTOM UI OVERRIDES ── */
-.is-mobile .profile-sidebar {
-  display: none !important;
-}
-
 .is-mobile .lobby-layout {
   flex-direction: column;
   overflow-y: auto;

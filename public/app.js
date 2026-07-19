@@ -195,14 +195,10 @@
   let chatTextSize = localStorage.getItem('vw_chat_size') || 'medium';
   let roomWallpaper = localStorage.getItem('vw_wallpaper') || 'cosmic';
   let soundNotifications = localStorage.getItem('vw_sound_notifications') !== 'false';
-  let myStatusText = localStorage.getItem('vw_status_text') || '';
-  let myAvatarColor = localStorage.getItem('vw_avatar_color') || 'cyan';
+  let myAvatarColor = 'cyan';
 
   function getAvatarPayload() {
-    if (userAvatar) {
-      return userAvatar;
-    }
-    return `data:image/vw;metadata,${JSON.stringify({ color: myAvatarColor, statusText: myStatusText })}`;
+    return `data:image/vw;metadata,${JSON.stringify({ color: myAvatarColor })}`;
   }
 
   function parseAvatarPayload(avatarStr) {
@@ -215,53 +211,20 @@
         return { type: 'initials', color: 'cyan', statusText: '' };
       }
     }
-    return { type: 'image', url: avatarStr, color: 'cyan', statusText: '' };
+    return { type: 'initials', color: 'cyan', statusText: '' };
   }
 
   function getAvatarClass(colorName) {
     return `avatar-accent-${colorName}`;
   }
 
-  function updateProfileAvatarColorOrText() {
-    const avatarContainer = $('#profile-avatar');
-    if (avatarContainer) {
-      avatarContainer.classList.remove('avatar-accent-cyan', 'avatar-accent-purple', 'avatar-accent-pink', 'avatar-accent-green', 'avatar-accent-orange', 'avatar-accent-red', 'avatar-accent-blue');
-      if (!userAvatar) {
-        avatarContainer.classList.add(getAvatarClass(myAvatarColor));
-        const colors = { cyan: '#22d3ee', purple: '#a855f7', pink: '#ec4899', green: '#22c55e', orange: '#f97316', red: '#ef4444', blue: '#3b82f6' };
-        avatarContainer.style.background = `linear-gradient(135deg, ${colors[myAvatarColor] || '#22d3ee'}, ${colors[myAvatarColor] || '#22d3ee'}dd)`;
-      } else {
-        avatarContainer.style.background = '';
-      }
-    }
-  }
+  function createBannerParticles() { /* removed */ }
 
-  function createBannerParticles() {
-    // Removed - banner is now clean and static
-  }
+  function updateProfileDisplayName() { /* removed */ }
 
-  function updateProfileDisplayName() {
-    const initial = $('#profile-avatar-initial');
-    if (initial && window.userName) {
-      initial.textContent = getInitial(window.userName);
-    }
-  }
+  function updateProfileStatusDot() { /* removed */ }
 
-  function updateProfileStatusDot() {
-    const dot = $('#profile-online-dot');
-    if (!dot) return;
-    dot.className = 'profile-online-dot';
-    if (myStatus === 'away') dot.classList.add('status-away');
-    else if (myStatus === 'dnd') dot.classList.add('status-dnd');
-    else if (myStatus === 'invisible') dot.classList.add('status-invisible');
-  }
-
-  function initProfile() {
-    createBannerParticles();
-    updateProfileDisplayName();
-    updateProfileStatusDot();
-    updateProfileAvatarColorOrText();
-  }
+  function initProfile() { /* removed */ }
 
   // ── SCREEN SHARE STATE (Discord-style: many people can stream at once) ──
   let screenStream = null;
@@ -415,91 +378,13 @@
     });
   }
 
-  function loadAvatar() {
-    try {
-      const saved = localStorage.getItem('vw_avatar');
-      if (saved) {
-        userAvatar = saved;
-        updateProfileAvatar();
-      }
-    } catch (e) { /* ignore */ }
-  }
+  function saveAvatar(dataUrl) { /* removed */ }
+  function removeAvatar() { /* removed */ }
+  function loadAvatar() { /* removed */ }
 
-  function saveAvatar(dataUrl) {
-    userAvatar = dataUrl;
-    try {
-      localStorage.setItem('vw_avatar', dataUrl);
-    } catch (e) {
-      toast('Avatar too large to save', 'error');
-    }
-    updateProfileAvatar();
-  }
+  function updateProfileAvatar() { /* removed */ }
 
-  function removeAvatar() {
-    userAvatar = null;
-    try { localStorage.removeItem('vw_avatar'); } catch (e) { /* ignore */ }
-    updateProfileAvatar();
-  }
-
-  function updateProfileAvatar() {
-    const initial = $('#profile-avatar-initial');
-    const img = $('#profile-avatar-img');
-    const removeBtn = $('#btn-remove-avatar');
-    const nameEl = $('#profile-display-name-input');
-    const colorGroup = $('#avatar-color-group');
-
-    if (userAvatar) {
-      img.src = userAvatar;
-      img.style.display = 'block';
-      initial.style.display = 'none';
-      removeBtn.style.display = 'inline-flex';
-      if (colorGroup) colorGroup.style.display = 'none';
-    } else {
-      img.style.display = 'none';
-      img.src = '';
-      initial.style.display = 'block';
-      removeBtn.style.display = 'none';
-      if (colorGroup) colorGroup.style.display = '';
-    }
-
-    if (window.userName) {
-      initial.textContent = getInitial(window.userName);
-      if (nameEl && nameEl.tagName === 'INPUT') {
-        nameEl.value = window.userName;
-      }
-    }
-    updateProfileAvatarColorOrText();
-  }
-
-  function handleAvatarUpload(file) {
-    if (!file || !file.type.startsWith('image/')) {
-      toast('Please select an image file', 'error');
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      toast('Image must be under 2MB', 'error');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const size = Math.min(img.width, img.height, 200);
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        const sx = (img.width - size) / 2;
-        const sy = (img.height - size) / 2;
-        ctx.drawImage(img, sx, sy, size, size, 0, 0, size, size);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-        saveAvatar(dataUrl);
-        toast('Avatar updated!', 'success');
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
-  }
+  function handleAvatarUpload(file) { /* removed */ }
 
   async function getMediaStream(deviceId) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -3939,16 +3824,6 @@
     if (manualShareFocusCheck) {
       manualShareFocusCheck.checked = manualShareFocus;
     }
-
-    const AVATAR_COLOR_LABELS_INIT = { cyan: 'Cyan Glow', purple: 'Purple Haze', pink: 'Pink Punch', green: 'Emerald', orange: 'Sunset Amber', red: 'Ruby Flare', blue: 'Royal Blue' };
-    const avatarColorLabel = $('#profile-avatar-color-trigger-label');
-    if (avatarColorLabel) avatarColorLabel.textContent = AVATAR_COLOR_LABELS_INIT[myAvatarColor] || myAvatarColor;
-    const avatarColorSwatch = $('#profile-avatar-color-swatch');
-    if (avatarColorSwatch) avatarColorSwatch.className = `color-swatch ${getAvatarClass(myAvatarColor)}`;
-    $(`#profile-avatar-color-menu [data-value="${myAvatarColor}"]`)?.classList.add('selected');
-
-    updateProfileStatusDot();
-    updateProfileAvatarColorOrText();
   }
 
   function initEventListeners() {
@@ -4308,26 +4183,7 @@
       }
     });
 
-    // Avatar upload
-    const avatarWrapper = $('#profile-avatar-wrapper');
-    const avatarInput = $('#avatar-input');
-    const removeAvatarBtn = $('#btn-remove-avatar');
-
-    if (avatarWrapper && avatarInput) {
-      avatarWrapper.addEventListener('click', () => avatarInput.click());
-      avatarInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) handleAvatarUpload(file);
-        avatarInput.value = '';
-      });
-    }
-    if (removeAvatarBtn) {
-      removeAvatarBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        removeAvatar();
-        toast('Avatar removed', 'info');
-      });
-    }
+    // Avatar upload disabled
 
     // Load saved username on init
     try {
@@ -4336,18 +4192,12 @@
         window.userName = savedName;
         const createInput = $('#create-name');
         const joinInput = $('#join-name');
-        const profileInput = $('#profile-display-name-input');
         if (createInput) createInput.value = savedName;
         if (joinInput) joinInput.value = savedName;
-        if (profileInput) profileInput.value = savedName;
       }
     } catch (e) { /* ignore */ }
 
-    // Load saved avatar on init
-    loadAvatar();
-
-    // Initialize profile features
-    initProfile();
+    // Avatar & profile features removed
 
     $$('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
@@ -4360,7 +4210,6 @@
 
     const updateProfileName = (name, originEl = null) => {
       window.userName = name;
-      updateProfileDisplayName();
       try {
         localStorage.setItem('vw_username', name);
       } catch (e) { /* ignore */ }
@@ -4368,23 +4217,15 @@
       // Sync input fields
       const createInput = $('#create-name');
       const joinInput = $('#join-name');
-      const profileInput = $('#profile-display-name-input');
       if (createInput && createInput !== originEl && createInput.value !== name) {
         createInput.value = name;
       }
       if (joinInput && joinInput !== originEl && joinInput.value !== name) {
         joinInput.value = name;
       }
-      if (profileInput && profileInput !== originEl && profileInput.value !== name) {
-        profileInput.value = name;
-      }
     };
     $('#create-name').addEventListener('input', (e) => updateProfileName(e.target.value.trim(), e.target));
     $('#join-name').addEventListener('input', (e) => updateProfileName(e.target.value.trim(), e.target));
-    const profileInput = $('#profile-display-name-input');
-    if (profileInput) {
-      profileInput.addEventListener('input', (e) => updateProfileName(e.target.value.trim(), e.target));
-    }
 
     $('#btn-create').addEventListener('click', () => {
       const name = $('#create-name').value.trim();
@@ -4624,21 +4465,6 @@
       manualShareFocus = e.target.checked;
       localStorage.setItem('vw_manual_share_focus', manualShareFocus ? '1' : '0');
       if (Object.keys(screenShares).length) renderScreenShares();
-    });
-
-    const AVATAR_COLOR_LABELS = { cyan: 'Cyan Glow', purple: 'Purple Haze', pink: 'Pink Punch', green: 'Emerald', orange: 'Sunset Amber', red: 'Ruby Flare', blue: 'Royal Blue' };
-    initCustomSelect('avatar-color-select-wrap', 'profile-avatar-color-menu', (value) => {
-      myAvatarColor = value;
-      localStorage.setItem('vw_avatar_color', myAvatarColor);
-      $('#profile-avatar-color-trigger-label').textContent = AVATAR_COLOR_LABELS[value] || value;
-      const swatch = $('#profile-avatar-color-swatch');
-      if (swatch) {
-        swatch.className = `color-swatch ${getAvatarClass(value)}`;
-      }
-      updateProfileAvatarColorOrText();
-      if (roomId && socket && socket.connected) {
-        socket.emit('join-room', { roomId, userName: window.userName, muted: isMuted, joinOnly: true, password: roomPassword, avatar: getAvatarPayload() });
-      }
     });
 
     $('#mic-gain').addEventListener('input', (e) => {
